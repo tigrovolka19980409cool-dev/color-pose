@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Color Pose</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Three.js для 3D-графики и сцены -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- TensorFlow.js и MoveNet для AI распознавания -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<style>
+  :root{
+    --bg:#05060c;
+    --bg2:#0b0e18;
+    --surface:#12172a;
+    --surface2:#1a2036;
+    --line:#262d47;
+    --text:#f3f5ff;
+    --muted:#8992b3;
+    --red:#ff3b5c;
+    --yellow:#ffcf39;
+    --blue:#3ea6ff;
+    --violet:#b072ff;
+    --green:#33ff9c;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(900px 700px at 18% 18%, rgba(62,166,255,.14), transparent 58%),
+      radial-gradient(760px 620px at 82% 28%, rgba(176,114,255,.13), transparent 60%),
+      radial-gradient(720px 620px at 50% 86%, rgba(51,255,156,.08), transparent 62%),
+      linear-gradient(160deg, #060711 0%, #090b17 48%, #05060c 100%);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+    height:100dvh;
+    width:100vw;
+    position:fixed;
+    inset:0;
+  }
+  body::before,
+  body::after{
+    content:"";
+    position:fixed;
+    width:52vmax;
+    height:52vmax;
+    border-radius:50%;
+    filter:blur(54px);
+    opacity:.20;
+    pointer-events:none;
+    z-index:0;
+    animation:ambientDrift 14s ease-in-out infinite alternate;
+  }
+  body::before{
+    left:-18vmax;
+    top:-20vmax;
+    background:radial-gradient(circle, rgba(62,166,255,.75), rgba(176,114,255,.25) 45%, transparent 72%);
+  }
+  body::after{
+    right:-20vmax;
+    bottom:-22vmax;
+    background:radial-gradient(circle, rgba(51,255,156,.45), rgba(255,59,92,.18) 48%, transparent 72%);
+    animation-delay:-7s;
+  }
+  @keyframes ambientDrift{
+    0%{transform:translate3d(0,0,0) scale(1);}
+    50%{transform:translate3d(4vmax,2vmax,0) scale(1.08);}
+    100%{transform:translate3d(1vmax,5vmax,0) scale(.96);}
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  #app{position:relative; width:100%; height:100%; z-index:1;}
+  .screen{
+    position:absolute; inset:0;
+    display:none;
+    flex-direction:column;
+    padding:max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  }
+  .screen.active{display:flex;}
+
+  .btn{
+    appearance:none; border:none; cursor:pointer;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:16px;
+    border-radius:16px; padding:16px 20px;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    color:var(--text);
+    background:linear-gradient(180deg, rgba(29,35,59,.88), rgba(18,23,42,.88));
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(123,137,184,.22);
+    transition:transform .12s ease, box-shadow .12s ease, background .12s ease;
+    width:100%;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{
+    background:linear-gradient(180deg,#3dffa0,#18d97e);
+    color:#05130b; box-shadow:0 0 0 1px rgba(57,255,140,.3), 0 8px 24px -8px rgba(57,255,140,.6);
+    font-weight:700;
+  }
+  .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--muted);}
+  .btn-icon-row{display:flex; align-items:center; gap:14px; padding:16px 18px;}
+  .btn-icon-row .ico{
+    width:40px; height:40px; border-radius:12px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.04);
+  }
+  .btn-icon-row .txt{text-align:left;}
+  .btn-icon-row .txt .t{font-weight:700; font-size:15px;}
+  .btn-icon-row .txt .s{font-size:12.5px; color:var(--muted); margin-top:1px;}
+  .btn-selected{border-color:var(--blue); background:rgba(62,166,255,.12); box-shadow:0 0 0 1px rgba(62,166,255,.35);}
+
+  #screen-splash{justify-content:space-between; padding-top:0;}
+  .splash-top{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; position:relative;}
+  .splash-glow{
+    position:absolute;
+    width:390px;
+    height:390px;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 28% 30%, rgba(62,166,255,.34), transparent 34%),
+      radial-gradient(circle at 72% 34%, rgba(176,114,255,.28), transparent 35%),
+      radial-gradient(circle at 54% 76%, rgba(51,255,156,.18), transparent 34%),
+      radial-gradient(circle, rgba(255,59,92,.08), transparent 70%);
+    filter:blur(18px);
+    animation:splashAura 7s ease-in-out infinite alternate;
+  }
+  .splash-glow::before,
+  .splash-glow::after{
+    content:"";
+    position:absolute;
+    inset:42px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.055);
+    box-shadow:
+      0 0 50px rgba(62,166,255,.08),
+      inset 0 0 35px rgba(176,114,255,.05);
+  }
+  .splash-glow::after{
+    inset:82px;
+    border-style:dashed;
+    opacity:.55;
+    animation:slowSpin 18s linear infinite;
+  }
+  @keyframes splashAura{
+    from{transform:scale(.96) rotate(-2deg); opacity:.78;}
+    to{transform:scale(1.06) rotate(2deg); opacity:1;}
+  }
+  @keyframes slowSpin{to{transform:rotate(360deg);}}
+  .logo-word{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    letter-spacing:1px;
+    font-size:56px;
+    line-height:1;
+    text-align:center;
+    position:relative;
+    filter:drop-shadow(0 10px 28px rgba(0,0,0,.28));
+    animation:logoFloat 4.6s ease-in-out infinite;
+  }
+  @keyframes logoFloat{
+    0%,100%{transform:translateY(0);}
+    50%{transform:translateY(-4px);}
+  }
+  .logo-word span{
+    display:inline-block;
+    text-shadow:0 0 18px currentColor;
+  }
+  .logo-word .l1{color:var(--red);}
+  .logo-word .l2{color:var(--yellow);}
+  .logo-word .l3{color:var(--green);}
+  .logo-word .l4{color:var(--blue);}
+  .logo-word .l5{color:var(--violet);}
+  .logo-sub{
+    font-size:34px;
+    color:var(--text);
+    font-weight:700;
+    margin-top:-6px;
+    letter-spacing:-1px;
+    text-shadow:0 0 22px rgba(255,255,255,.06);
+  }
+  .tagline{display:none;}
+  .loading-wrap{padding-bottom:36px; position:relative;}
+  .loading-bar{width:180px; height:4px; border-radius:4px; background:var(--line); margin:0 auto 10px; overflow:hidden;}
+  .loading-fill{
+    height:100%;
+    width:20%;
+    background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue),var(--violet));
+    background-size:220% 100%;
+    border-radius:4px;
+    box-shadow:0 0 14px rgba(62,166,255,.45);
+    animation:load 1.4s ease-in-out infinite, rainbowShift 3.6s linear infinite;
+  }
+  @keyframes rainbowShift{to{background-position:220% 0;}}
+  @keyframes load{ 0%{width:10%; margin-left:0;} 50%{width:60%; margin-left:20%;} 100%{width:10%; margin-left:90%;} }
+  .loading-label{text-align:center; font-size:11px; letter-spacing:2px; color:var(--muted);}
+
+  .topbar{display:flex; align-items:center; gap:14px; padding-bottom:18px; flex:none;}
+  .topbar .back{
+    width:38px; height:38px; border-radius:12px; background:var(--surface);
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  }
+  .topbar h2{font-size:19px; margin:0;}
+
+  .menu-hero{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;}
+  .menu-hero .logo-word{font-size:44px;}
+  .menu-hero .logo-sub{font-size:26px;}
+  .menu-hero .tagline{margin-top:6px;}
+  .menu-actions{display:flex; flex-direction:column; gap:12px; padding-bottom:10px;}
+  .menu-footer{display:flex; gap:10px; padding-top:16px;}
+  .footer-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:12px 6px; border-radius:14px; background:var(--surface);
+    border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:600;
+    cursor:pointer;
+  }
+
+  .mode-list{display:flex; flex-direction:column; gap:12px; margin-top:6px;}
+  .howto-list{display:flex; flex-direction:column; gap:12px; overflow-y:auto; padding-bottom:16px;}
+  .howto-card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px; display:flex; gap:14px; align-items:center;}
+  .howto-card .num{
+    width:30px; height:30px; border-radius:9px; background:var(--surface2); flex:none;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:var(--blue);
+  }
+  .howto-card p{margin:0; font-size:13.5px; color:#c7cce3; line-height:1.4;}
+  .pose-legend{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px;}
+  .legend-chip{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px;
+    background:var(--surface); border:1px solid var(--line); font-size:12.5px; font-weight:700;
+  }
+  .legend-dot{width:14px; height:14px; border-radius:5px; flex:none;}
+
+  #screen-camera{padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));}
+  .cam-header{text-align:center; margin-bottom:12px; flex:none;}
+  .cam-header h2{margin:0 0 4px; font-size:19px;}
+  .cam-header p{margin:0; font-size:12.5px; color:var(--muted);}
+  .cam-stage{
+    position:relative; flex:1; border-radius:22px; overflow:hidden;
+    background:#000; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+  }
+  video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); opacity: 0.35;}
+  #webgl-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .cam-frame-corner{position:absolute; width:26px; height:26px; border-color:rgba(255,255,255,.55); z-index:3; pointer-events:none;}
+  .cc-tl{top:14px; left:14px; border-top:3px solid; border-left:3px solid; border-radius:8px 0 0 0;}
+  .cc-tr{top:14px; right:14px; border-top:3px solid; border-right:3px solid; border-radius:0 8px 0 0;}
+  .cc-bl{bottom:14px; left:14px; border-bottom:3px solid; border-left:3px solid; border-radius:0 0 0 8px;}
+  .cc-br{bottom:14px; right:14px; border-bottom:3px solid; border-right:3px solid; border-radius:0 0 8px 0;}
+  .cam-status{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:3;
+    background:rgba(5,6,12,.65); backdrop-filter:blur(6px); border:1px solid var(--line);
+    padding:7px 14px; border-radius:999px; font-size:11.5px; font-weight:600; color:var(--muted);
+    display:flex; align-items:center; gap:7px;
+  }
+  .dot-pulse{width:7px; height:7px; border-radius:50%; background:var(--red);}
+  .dot-pulse.ok{background:var(--green); box-shadow:0 0 8px var(--green);}
+  .cam-footer{padding-top:14px; flex:none;}
+  .cam-hint{text-align:center; font-size:11.5px; color:var(--muted); margin:8px 0 12px;}
+
+  #screen-countdown{align-items:center; justify-content:center; gap:22px;}
+  .cd-video-wrap{position:relative; width:100%; max-width:420px; aspect-ratio:3/4; border-radius:22px; overflow:hidden; border:1px solid var(--line);}
+  .cd-ring{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(5,6,12,.35);
+  }
+  .cd-circle{
+    width:130px; height:130px; border-radius:50%; border:5px solid rgba(255,255,255,.12);
+    border-top-color:var(--green); display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:56px;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .cd-label{font-weight:700; font-size:20px; letter-spacing:1px;}
+  .cd-sub{color:var(--muted); font-size:13px;}
+
+  #screen-play{padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); gap:10px;}
+  .hud{display:flex; align-items:center; justify-content:space-between; flex:none; padding:2px 4px;}
+  .hud-block{display:flex; flex-direction:column; gap:2px;}
+  .hud-label{font-size:9.5px; letter-spacing:1.5px; color:var(--muted); font-weight:700;}
+  .hud-value{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;}
+  .hearts{display:flex; gap:4px;}
+  .heart{width:16px; height:16px;}
+  .play-stage{
+    position:relative;
+    flex:1;
+    border-radius:20px;
+    overflow:hidden;
+    border:1px solid var(--line);
+    background:#000;
+    box-shadow:0 18px 50px rgba(0,0,0,.35);
+  }
+  .play-stage::after{
+    content:"";
+    position:absolute;
+    inset:-22%;
+    z-index:1;
+    pointer-events:none;
+    background:radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--pose-color, var(--blue)) 26%, transparent), transparent 58%);
+    opacity:.55;
+    filter:blur(26px);
+    transition:background .25s ease, opacity .25s ease;
+  }
+  .play-stage > *{position:relative; z-index:2;}
+  .play-stage > video,
+  .play-stage > canvas{position:absolute; z-index:0;}
+  .pose-card{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:4;
+    display:flex; align-items:center; gap:10px; padding:10px 18px 10px 12px;
+    border-radius:999px; background:rgba(5,6,12,.55); backdrop-filter:blur(8px);
+    border:1.5px solid var(--pose-color, var(--blue)); box-shadow:0 0 18px -4px var(--pose-color, var(--blue));
+  }
+  .pose-card .ico{width:26px; height:26px; color:var(--pose-color, var(--blue));}
+  .pose-card .txt{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; letter-spacing:.5px; color:var(--pose-color, var(--blue));}
+  .combo-pill{
+    position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:4;
+    font-size:11px; font-weight:700; color:var(--yellow); background:rgba(5,6,12,.5);
+    padding:4px 10px; border-radius:999px; opacity:0; transition:opacity .2s ease;
+  }
+  .combo-pill.show{opacity:1;}
+  .flash-msg{
+    position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:6px; pointer-events:none; opacity:0;
+  }
+  .flash-msg.show{opacity:1; animation:pop .55s ease;}
+  @keyframes pop{ 0%{transform:scale(.7); opacity:0;} 45%{transform:scale(1.06); opacity:1;} 100%{transform:scale(1); opacity:1;} }
+  .flash-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:34px;}
+  .flash-title.good{color:var(--green); text-shadow:0 0 22px rgba(51,255,156,.7);}
+  .flash-title.great{color:var(--blue); text-shadow:0 0 22px rgba(62,166,255,.7);}
+  .flash-title.ok{color:var(--yellow); text-shadow:0 0 22px rgba(255,207,57,.7);}
+  .flash-title.bad{color:var(--red); text-shadow:0 0 22px rgba(255,59,92,.7);}
+  .match-pct{position:absolute; bottom:60px; left:50%; transform:translateX(-50%); z-index:4; font-size:10.5px; font-weight:700; color:var(--muted); background:rgba(5,6,12,.5); padding:2px 8px; border-radius:99px;}
+  .flash-points{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; color:var(--green);}
+  .timer-wrap{position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:4; display:flex; flex-direction:column; align-items:center; gap:6px; width:88%;}
+  .timer-bar-bg{width:100%; height:7px; border-radius:99px; background:rgba(255,255,255,.12); overflow:hidden;}
+  .timer-bar-fill{height:100%; border-radius:99px; background:linear-gradient(90deg,var(--pose-color,var(--blue)),var(--green)); width:100%; transition:width .08s linear;}
+  .timer-num{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; color:var(--text); background:rgba(5,6,12,.5); padding:2px 10px; border-radius:99px;}
+  .match-ring{position:absolute; bottom:52px; left:50%; transform:translateX(-50%); z-index:4; width:60%; height:5px; background:rgba(255,255,255,.1); border-radius:99px; overflow:hidden;}
+  .match-fill{height:100%; width:0%; background:var(--green); border-radius:99px; transition:width .06s linear;}
+
+  #screen-result{align-items:center; justify-content:center; gap:18px; text-align:center;}
+  .result-badge{width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle,rgba(255,59,92,.25),transparent 70%); border:1px solid var(--red);}
+  .result-title{font-size:24px; margin:0;}
+  .result-score{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:44px; color:var(--green);}
+  .result-stats{display:flex; gap:10px; width:100%;}
+  .stat-box{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 8px;}
+  .stat-box .v{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:19px;}
+  .stat-box .l{font-size:10.5px; color:var(--muted); margin-top:3px; letter-spacing:.5px;}
+  .result-actions{display:flex; flex-direction:column; gap:12px; width:100%; margin-top:8px;}
+
+  .toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--surface2); border:1px solid var(--line); padding:11px 18px; border-radius:14px;
+    font-size:13px; font-weight:600; z-index:50; opacity:0; transition:all .25s ease; pointer-events:none;
+    max-width:88%; text-align:center;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .settings-list{display:flex; flex-direction:column; gap:12px;}
+  .setting-row{display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 16px;}
+  .setting-row .t{font-weight:600; font-size:14px;}
+  .switch{width:46px; height:26px; border-radius:99px; background:var(--surface2); border:1px solid var(--line); position:relative; cursor:pointer; flex:none;}
+  .switch .knob{position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .18s ease;}
+  .switch.on{background:rgba(51,255,156,.18); border-color:var(--green);}
+  .switch.on .knob{left:22px; background:var(--green);}
+
+  .center-msg{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px;}
+  .center-msg p{color:var(--muted); font-size:13.5px; max-width:280px; line-height:1.5; margin:0;}
+  .lang-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .lang-btn{padding:12px 10px; border-radius:12px; background:var(--surface2); border:1px solid var(--line); color:var(--text); font-weight:600; font-size:12.5px; cursor:pointer; text-align:left;}
+  .lang-btn.active{border-color:var(--green); background:rgba(51,255,156,.12); color:var(--green); font-weight:700;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 1. SPLASH -->
+  <section class="screen active" id="screen-splash">
+    <div class="splash-top">
+      <div class="splash-glow"></div>
+      <div style="position:relative">
+        <div class="logo-word"><span class="l1">C</span><span class="l2">O</span><span class="l3">L</span><span class="l4">O</span><span class="l5">R</span></div>
+        <div class="logo-sub">POSE</div>
+      </div>
+      <div class="tagline" data-i18n="tagline">MOVE · REACT · HAVE FUN</div>
+    </div>
+    <div class="loading-wrap">
+      <div class="loading-bar"><div class="loading-fill"></div></div>
+      <div class="loading-label" data-i18n="loading">LOADING...</div>
+    </div>
+  </section>
+
+  <!-- 2. MENU -->
+  <section class="screen" id="screen-menu">
+    <div class="menu-hero">
+      <div class="logo-word"><span class="l1">C</span><span class="l2">O</span><span class="l3">L</span><span class="l4">O</span><span class="l5">R</span></div>
+      <div class="logo-sub">POSE</div>
+      <div class="tagline" data-i18n="tagline">MOVE · REACT · HAVE FUN</div>
+    </div>
+    <div class="menu-actions">
+      <button class="btn btn-primary" id="btn-play"><span data-i18n="menuPlay">▶ &nbsp;PLAY</span></button>
+      <button class="btn btn-ghost" id="btn-howto" data-i18n="menuHowTo">How to play</button>
+      <button class="btn btn-ghost" id="btn-settings" data-i18n="menuSettings">Settings</button>
+    </div>
+    <div class="menu-footer">
+      <div class="footer-item" data-toast-key="toastLeaderboard"><span>🏆</span><span data-i18n="footerLeaderboard">Leaderboard</span></div>
+      <div class="footer-item" data-toast-key="toastAchievements"><span>🎖️</span><span data-i18n="footerAchievements">Achievements</span></div>
+      <div class="footer-item" data-toast-key="toastShop"><span>🛒</span><span data-i18n="footerShop">Shop</span></div>
+    </div>
+  </section>
+
+  <!-- 3. MODE SELECT -->
+  <section class="screen" id="screen-mode">
+    <div class="topbar"><div class="back" data-target="screen-menu">←</div><h2 data-i18n="modeTitle">Choose mode</h2></div>
+    <div class="mode-list">
+      <button class="btn btn-icon-row btn-selected" data-mode="1">
+        <div class="ico">🧍</div>
+        <div class="txt"><div class="t" data-i18n="mode1Title">1 PLAYER</div><div class="s" data-i18n="mode1Sub">Play solo</div></div>
+      </button>
+      <button class="btn btn-icon-row" data-mode="2" data-toast-key="mode2Toast">
+        <div class="ico">👥</div>
+        <div class="txt"><div class="t" data-i18n="mode2Title">2 PLAYERS</div><div class="s" data-i18n="mode2Sub">Play together</div></div>
+      </button>
+      <button class="btn btn-icon-row" data-mode="3" data-toast-key="mode3Toast">
+        <div class="ico">👨‍👩‍👧</div>
+        <div class="txt"><div class="t" data-i18n="mode3Title">3–4 PLAYERS</div><div class="s" data-i18n="mode3Sub">Even more fun</div></div>
+      </button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" id="btn-mode-continue" data-i18n="continueBtn">Continue</button>
+  </section>
+
+  <!-- 4. HOW TO PLAY -->
+  <section class="screen" id="screen-howto">
+    <div class="topbar"><div class="back" data-target="screen-menu">←</div><h2 data-i18n="howToTitle">How to play</h2></div>
+    <div class="howto-list">
+      <div class="howto-card"><div class="num">1</div><p data-i18n="howto1">Stand so your whole body is visible to the camera.</p></div>
+      <div class="howto-card"><div class="num">2</div><p data-i18n="howto2">A colored pose appears — copy it with your body before time runs out.</p></div>
+      <div class="howto-card"><div class="num">3</div><p data-i18n="howto3">The more accurate and faster you are, the more points and combo you get.</p></div>
+      <div class="howto-card"><div class="num">4</div><p data-i18n="howto4">Accuracy scale: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · MISS below 60%.</p></div>
+      <div class="pose-legend">
+        <div class="legend-chip"><span class="legend-dot" style="background:var(--red)"></span><span data-i18n="legendRed">FREEZE</span></div>
+        <div class="legend-chip"><span class="legend-dot" style="background:var(--green)"></span><span data-i18n="legendGreen">MOVEMENT</span></div>
+        <div class="legend-chip"><span class="legend-dot" style="background:var(--yellow)"></span><span data-i18n="legendYellow">JUMP/BALANCE</span></div>
+        <div class="legend-chip"><span class="legend-dot" style="background:var(--blue)"></span><span data-i18n="legendBlue">LOW</span></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" data-target="screen-menu" data-i18n="gotIt">Got it</button>
+  </section>
+
+  <!-- 5. SETTINGS -->
+  <section class="screen" id="screen-settings">
+    <div class="topbar"><div class="back" data-target="screen-menu">←</div><h2 data-i18n="settingsTitle">Settings</h2></div>
+    <div class="settings-list">
+      <div class="setting-row"><div class="t" data-i18n="settingSound">Sound</div><div class="switch on" id="sw-sound"><div class="knob"></div></div></div>
+      <div class="setting-row"><div class="t" data-i18n="settingMirror">Mirror camera</div><div class="switch on" id="sw-mirror"><div class="knob"></div></div></div>
+      <div class="setting-row"><div class="t" data-i18n="settingSkeleton">Show skeleton</div><div class="switch on" id="sw-skeleton"><div class="knob"></div></div></div>
+      <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:12px;">
+        <div class="t" data-i18n="settingLanguage">Language</div>
+        <div class="lang-grid" id="lang-grid">
+          <button class="lang-btn" data-lang="ru">RU · Русский</button>
+          <button class="lang-btn" data-lang="en">EN · English</button>
+          <button class="lang-btn" data-lang="uk">UA · Українська</button>
+          <button class="lang-btn" data-lang="de">DE · Deutsch</button>
+          <button class="lang-btn" data-lang="it">IT · Italiano</button>
+          <button class="lang-btn" data-lang="fr">FR · Français</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. CAMERA SETUP -->
+  <section class="screen" id="screen-camera">
+    <div class="cam-header"><h2 data-i18n="camTitle">Camera setup</h2><p data-i18n="camSub">Stand so your whole body is visible in frame</p></div>
+    <div class="cam-stage">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="webgl-canvas"></canvas>
+      <div class="cam-frame-corner cc-tl"></div>
+      <div class="cam-frame-corner cc-tr"></div>
+      <div class="cam-frame-corner cc-bl"></div>
+      <div class="cam-frame-corner cc-br"></div>
+      <div class="cam-status"><span class="dot-pulse" id="cam-dot"></span><span id="cam-status-text" data-i18n="camSearching">Looking for your body...</span></div>
+    </div>
+    <div class="cam-footer">
+      <div class="cam-hint" id="cam-hint" data-i18n="camHint">Once the frame turns green, tap "Ready"</div>
+      <button class="btn btn-primary" id="btn-ready" disabled style="opacity:.4;"><span data-i18n="readyBtn">✓ &nbsp;READY</span></button>
+    </div>
+  </section>
+
+  <!-- CAMERA ERROR -->
+  <section class="screen" id="screen-camerror">
+    <div class="topbar"><div class="back" data-target="screen-menu">←</div><h2 data-i18n="camErrorTitle">Camera unavailable</h2></div>
+    <div class="center-msg">
+      <div style="font-size:44px">🚫</div>
+      <p id="camerror-text">Could not access the camera.</p>
+      <button class="btn btn-primary" id="btn-cam-retry" style="max-width:220px;" data-i18n="retryBtn">Try again</button>
+    </div>
+  </section>
+
+  <!-- 7. COUNTDOWN -->
+  <section class="screen" id="screen-countdown">
+    <div class="cd-video-wrap">
+      <div class="cd-ring">
+        <div class="cd-circle" id="cd-number">3</div>
+      </div>
+    </div>
+    <div class="cd-label" data-i18n="getReady">GET READY!</div>
+    <div class="cd-sub" data-i18n="nextPoseIn">Next pose in...</div>
+  </section>
+
+  <!-- 8. GAMEPLAY -->
+  <section class="screen" id="screen-play">
+    <div class="hud">
+      <div class="hud-block"><div class="hud-label" data-i18n="hudScore">SCORE</div><div class="hud-value" id="hud-score">0</div></div>
+      <div class="hearts" id="hud-hearts"></div>
+      <div class="hud-block" style="align-items:flex-end;"><div class="hud-label" data-i18n="hudLevel">LEVEL</div><div class="hud-value" id="hud-level">1</div></div>
+    </div>
+    <div class="play-stage">
+      <video id="video2" autoplay playsinline muted></video>
+      <canvas id="webgl-canvas2"></canvas>
+      <div class="pose-card" id="pose-card">
+        <div class="ico" id="pose-ico"></div>
+        <div class="txt" id="pose-text">T-ПОЗА</div>
+      </div>
+      <div class="combo-pill" id="combo-pill">COMBO ×2</div>
+      <div class="flash-msg" id="flash-msg">
+        <div class="flash-title" id="flash-title">PERFECT!</div>
+        <div class="flash-points" id="flash-points">+100</div>
+      </div>
+      <div class="match-ring"><div class="match-fill" id="match-fill"></div></div>
+      <div class="match-pct" id="match-pct">0%</div>
+      <div class="timer-wrap">
+        <div class="timer-bar-bg"><div class="timer-bar-fill" id="timer-fill"></div></div>
+        <div class="timer-num" id="timer-num">4.0</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. RESULT -->
+  <section class="screen" id="screen-result">
+    <div class="result-badge">💔</div>
+    <h2 class="result-title" data-i18n="resultTitle">Game over</h2>
+    <div class="result-score" id="result-score">0</div>
+    <div class="result-stats">
+      <div class="stat-box"><div class="v" id="result-level">1</div><div class="l" data-i18n="statLevel">LEVEL</div></div>
+      <div class="stat-box"><div class="v" id="result-combo">0</div><div class="l" data-i18n="statCombo">BEST COMBO</div></div>
+      <div class="stat-box"><div class="v" id="result-best">0</div><div class="l" data-i18n="statBest">BEST SCORE</div></div>
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-primary" id="btn-again" data-i18n="playAgain">Play again</button>
+      <button class="btn btn-ghost" id="btn-to-menu" data-i18n="toMenu">To menu</button>
+    </div>
+  </section>
+
+  <!-- LOADING MODEL -->
+  <section class="screen" id="screen-modelload">
+    <div class="center-msg">
+      <div class="cd-circle" style="width:70px; height:70px; font-size:0;"></div>
+      <h2 style="margin:0;" data-i18n="modelLoadTitle">Loading AI model</h2>
+      <p data-i18n="modelLoadSub">This takes a couple of seconds; after that everything runs directly in your browser.</p>
+    </div>
+  </section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+const settings = { sound: true, mirror: true, skeleton: true, lang: 'en' };
+
+const TR = {
+  tagline:      { ru:'ДВИГАЙСЯ · РЕАГИРУЙ · ИГРАЙ', en:'MOVE · REACT · HAVE FUN', uk:'РУХАЙСЯ · РЕАГУЙ · ГРАЙ', de:'BEWEGEN · REAGIEREN · SPIELEN', it:'MUOVITI · REAGISCI · GIOCA', fr:'BOUGE · RÉAGIS · JOUE' },
+  loading:      { ru:'ЗАГРУЗКА...', en:'LOADING...', uk:'ЗАВАНТАЖЕННЯ...', de:'LADEN...', it:'CARICAMENTO...', fr:'CHARGEMENT...' },
+  menuPlay:     { ru:'▶ &nbsp;ИГРАТЬ', en:'▶ &nbsp;PLAY', uk:'▶ &nbsp;ГРАТИ', de:'▶ &nbsp;SPIELEN', it:'▶ &nbsp;GIOCA', fr:'▶ &nbsp;JOUER' },
+  menuHowTo:    { ru:'Как играть', en:'How to play', uk:'Як грати', de:'Spielanleitung', it:'Come giocare', fr:'Comment jouer' },
+  menuSettings: { ru:'Настройки', en:'Settings', uk:'Налаштування', de:'Einstellungen', it:'Impostazioni', fr:'Paramètres' },
+  footerLeaderboard:{ ru:'Рейтинг', en:'Leaderboard', uk:'Рейтинг', de:'Rangliste', it:'Classifica', fr:'Classement' },
+  footerAchievements:{ ru:'Награды', en:'Achievements', uk:'Нагороди', de:'Erfolge', it:'Obiettivi', fr:'Succès' },
+  footerShop:   { ru:'Магазин', en:'Shop', uk:'Магазин', de:'Shop', it:'Negozio', fr:'Boutique' },
+  toastLeaderboard:{ ru:'Таблица лидеров скоро появится', en:'Leaderboard is coming soon', uk:'Таблиця лідерів скоро з’явиться', de:'Rangliste kommt bald', it:'La classifica arriverà presto', fr:'Le classement arrive bientôt' },
+  toastAchievements:{ ru:'Достижения скоро появятся', en:'Achievements are coming soon', uk:'Досягнення скоро з’являться', de:'Erfolge kommen bald', it:'Gli obiettivi arriveranno presto', fr:'Les succès arrivent bientôt' },
+  toastShop:    { ru:'Магазин скоро появится', en:'Shop is coming soon', uk:'Магазин скоро з’явиться', de:'Shop kommt bald', it:'Il negozio arriverà presto', fr:'La boutique arrive bientôt' },
+  modeTitle:    { ru:'Выбор режима', en:'Choose mode', uk:'Вибір режиму', de:'Modus wählen', it:'Scegli modalità', fr:'Choisir le mode' },
+  mode1Title:   { ru:'1 ИГРОК', en:'1 PLAYER', uk:'1 ГРАВЕЦЬ', de:'1 SPIELER', it:'1 GIOCATORE', fr:'1 JOUEUR' },
+  mode1Sub:     { ru:'Играть в одиночку', en:'Play solo', uk:'Грати наодинці', de:'Alleine spielen', it:'Gioca da solo', fr:'Jouer seul' },
+  mode2Title:   { ru:'2 ИГРОКА', en:'2 PLAYERS', uk:'2 ГРАВЦІ', de:'2 SPIELER', it:'2 GIOCATORI', fr:'2 JOUEURS' },
+  mode2Sub:     { ru:'Играть вместе', en:'Play together', uk:'Грати разом', de:'Zusammen spielen', it:'Gioca insieme', fr:'Jouer ensemble' },
+  mode2Toast:   { ru:'Режим на 2 игроков скоро будет доступен', en:'2-player mode coming soon', uk:'Режим на 2 гравців скоро буде доступний', de:'2-Spieler-Modus kommt bald', it:'Modalità a 2 giocatori in arrivo', fr:'Mode 2 joueurs bientôt disponible' },
+  mode3Title:   { ru:'3–4 ИГРОКА', en:'3–4 PLAYERS', uk:'3–4 ГРАВЦІ', de:'3–4 SPIELER', it:'3–4 GIOCATORI', fr:'3–4 JOUEURS' },
+  mode3Sub:     { ru:'Ещё веселее', en:'Even more fun', uk:'Ще веселіше', de:'Noch mehr Spaß', it:'Ancora più divertimento', fr:'Encore plus amusant' },
+  mode3Toast:   { ru:'Режим на 3–4 игроков скоро будет доступен', en:'3–4 player mode coming soon', uk:'Режим на 3–4 гравців скоро буде доступний', de:'3–4-Spieler-Modus kommt bald', it:'Modalità a 3–4 giocatori in arrivo', fr:'Mode 3–4 joueurs bientôt disponible' },
+  continueBtn:  { ru:'Продолжить', en:'Continue', uk:'Продовжити', de:'Weiter', it:'Continua', fr:'Continuer' },
+  howToTitle:   { ru:'Как играть', en:'How to play', uk:'Як грати', de:'Spielanleitung', it:'Come giocare', fr:'Comment jouer' },
+  howto1:       { ru:'Встань так, чтобы всё тело было видно в камере.', en:'Stand so your whole body is visible to the camera.', uk:'Стань так, щоб все тіло було видно в камері.', de:'Stell dich so hin, dass dein ganzer Körper sichtbar ist.', it:'Mettiti in modo che tutto il corpo sia visibile.', fr:'Placez-vous pour que tout votre corps soit visible.' },
+  howto2:       { ru:'На экране появится цветная поза — повтори её телом до конца таймера.', en:'A colored pose appears — copy it with your body before time runs out.', uk:'На екрані з’явиться кольорова поза — повтори її тілом до кінця таймера.', de:'Eine farbige Pose erscheint — mach sie mit deinem Körper nach, bevor die Zeit abläuft.', it:'Apparirà una posa colorata: riproducila con il corpo prima che scada il tempo.', fr:'Une pose colorée apparaît — reproduisez-la avant la fin du minuteur.' },
+  howto3:       { ru:'Чем точнее и быстрее повторишь позу — тем больше очков и комбо.', en:'The more accurate and faster you are, the more points and combo you get.', uk:'Що точніше й швидше повториш позу — то більше очок і комбо.', de:'Je genauer und schneller, desto mehr Punkte und Combo.', it:'Più sei preciso e veloce, più punti e combo ottieni.', fr:'Plus vous êtes précis et rapide, plus vous gagnez de points et de combo.' },
+  howto4:       { ru:'Точность оценивается по шкале: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · МИМО меньше 60%.', en:'Accuracy scale: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · MISS below 60%.', uk:'Точність оцінюється: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · МИМО менше 60%.', de:'Genauigkeit: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · VERFEHLT unter 60%.', it:'Precisione: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · MANCATO sotto il 60%.', fr:'Précision: PERFECT 90–100% · GREAT 75–89% · OK 60–74% · RATÉ en dessous de 60%.' },
+  legendRed:    { ru:'FREEZE', en:'FREEZE', uk:'FREEZE', de:'FREEZE', it:'FREEZE', fr:'FREEZE' },
+  legendGreen:  { ru:'ДВИЖЕНИЕ', en:'MOVEMENT', uk:'РУХ', de:'BEWEGUNG', it:'MOVIMENTO', fr:'MOUVEMENT' },
+  legendYellow: { ru:'ПРЫЖОК/БАЛАНС', en:'JUMP/BALANCE', uk:'СТРИБОК/БАЛАНС', de:'SPRUNG/BALANCE', it:'SALTO/EQUILIBRIO', fr:'SAUT/ÉQUILIBRE' },
+  legendBlue:   { ru:'НИЗКО', en:'LOW', uk:'НИЗЬКО', de:'TIEF', it:'BASSO', fr:'BAS' },
+  gotIt:        { ru:'Понятно', en:'Got it', uk:'Зрозуміло', de:'Verstanden', it:'Capito', fr:'Compris' },
+  settingsTitle:{ ru:'Настройки', en:'Settings', uk:'Налаштування', de:'Einstellungen', it:'Impostazioni', fr:'Paramètres' },
+  settingSound: { ru:'Звук', en:'Sound', uk:'Звук', de:'Ton', it:'Audio', fr:'Son' },
+  settingMirror:{ ru:'Зеркальная камера', en:'Mirror camera', uk:'Дзеркальна камера', de:'Spiegelkamera', it:'Camera speculare', fr:'Caméra miroir' },
+  settingSkeleton:{ ru:'Показывать скелет', en:'Show skeleton', uk:'Показувати скелет', de:'Skelett anzeigen', it:'Mostra scheletro', fr:'Afficher le squelette' },
+  settingLanguage:{ ru:'Язык', en:'Language', uk:'Мова', de:'Sprache', it:'Lingua', fr:'Langue' },
+  camTitle:     { ru:'Настройка камеры', en:'Camera setup', uk:'Налаштування камери', de:'Kamera-Einrichtung', it:'Configurazione camera', fr:'Configuration caméra' },
+  camSub:       { ru:'Встань так, чтобы всё тело было видно в кадре', en:'Stand so your whole body is visible in frame', uk:'Стань так, щоб усе тіло було видно в кадрі', de:'Stell dich so hin, dass dein ganzer Körper im Bild ist', it:'Mettiti in modo che tutto il corpo sia inquadrato', fr:'Placez-vous pour que tout votre corps soit dans le cadre' },
+  camSearching: { ru:'Ищем тело...', en:'Looking for your body...', uk:'Шукаємо тіло...', de:'Suche nach Körper...', it:'Ricerca del corpo...', fr:'Recherche du corps...' },
+  camDetected:  { ru:'Тело обнаружено', en:'Body detected', uk:'Тіло виявлено', de:'Körper erkannt', it:'Corpo rilevato', fr:'Corps détecté' },
+  camStepBack:  { ru:'Отойди, чтобы было видно всё тело', en:'Step back so your whole body is visible', uk:'Відійди, щоб було видно все тіло', de:'Geh zurück, damit dein ganzer Körper sichtbar ist', it:'Allontanati per rendere visibile tutto il corpo', fr:'Reculez pour que tout votre corps soit visible' },
+  camHint:      { ru:'Как только рамка станет зелёной — нажми «Готов»', en:'Once the frame turns green, tap "Ready"', uk:'Щойно рамка стане зеленою — натисни «Готово»', de:'Sobald der Rahmen grün wird, tippe auf „Bereit“', it:'Quando la cornice diventa verde, tocca "Pronto"', fr:'Quand le cadre devient vert, appuyez sur « Prêt »' },
+  readyBtn:     { ru:'✓ &nbsp;ГОТОВ', en:'✓ &nbsp;READY', uk:'✓ &nbsp;ГОТОВО', de:'✓ &nbsp;BEREIT', it:'✓ &nbsp;PRONTO', fr:'✓ &nbsp;PRÊT' },
+  camErrorTitle:{ ru:'Камера недоступна', en:'Camera unavailable', uk:'Камера недоступна', de:'Kamera nicht verfügbar', it:'Camera non disponibile', fr:'Caméra indisponible' },
+  camErrorModel:{ ru:'Не удалось загрузить модель распознавания позы.', en:'Could not load the pose recognition model.', uk:'Не вдалося завантажити модель розпізнавання пози.', de:'Das Posenerkennungsmodell konnte nicht geladen werden.', it:'Impossibile caricare il modello.', fr:'Impossible de charger le modèle.' },
+  retryBtn:     { ru:'Попробовать снова', en:'Try again', uk:'Спробувати знову', de:'Erneut versuchen', it:'Riprova', fr:'Réessayer' },
+  getReady:     { ru:'ПРИГОТОВЬСЯ!', en:'GET READY!', uk:'ПРИГОТУЙСЯ!', de:'MACH DICH BEREIT!', it:'PREPARATI!', fr:'PRÉPAREZ-VOUS !' },
+  nextPoseIn:   { ru:'Следующая поза через...', en:'Next pose in...', uk:'Наступна поза через...', de:'Nächste Pose in...', it:'Prossima posa tra...', fr:'Prochaine pose dans...' },
+  hudScore:     { ru:'СЧЁТ', en:'SCORE', uk:'РАХУНОК', de:'PUNKTE', it:'PUNTI', fr:'SCORE' },
+  hudLevel:     { ru:'УРОВЕНЬ', en:'LEVEL', uk:'РІВЕНЬ', de:'LEVEL', it:'LIVELLO', fr:'NIVEAU' },
+  resultTitle:  { ru:'Игра окончена', en:'Game over', uk:'Гру закінчено', de:'Spiel vorbei', it:'Partita finita', fr:'Partie terminée' },
+  statLevel:    { ru:'УРОВЕНЬ', en:'LEVEL', uk:'РІВЕНЬ', de:'LEVEL', it:'LIVELLO', fr:'NIVEAU' },
+  statCombo:    { ru:'ЛУЧШЕЕ КОМБО', en:'BEST COMBO', uk:'НАЙКРАЩЕ КОМБО', de:'BESTE COMBO', it:'MIGLIOR COMBO', fr:'MEILLEUR COMBO' },
+  statBest:     { ru:'РЕКОРД', en:'BEST SCORE', uk:'РЕКОРД', de:'BESTLEISTUNG', it:'RECORD', fr:'RECORD' },
+  playAgain:    { ru:'Играть снова', en:'Play again', uk:'Грати знову', de:'Nochmal spielen', it:'Gioca ancora', fr:'Rejouer' },
+  toMenu:       { ru:'В меню', en:'To menu', uk:'До меню', de:'Zum Menü', it:'Al menu', fr:'Au menu' },
+  modelLoadTitle:{ ru:'Загружаем AI-модель', en:'Loading AI model', uk:'Завантажуємо AI-модель', de:'Lade KI-Modell', it:'Caricamento modello IA', fr:'Chargement du modèle IA' },
+  modelLoadSub: { ru:'Это займёт пару секунд...', en:'This takes a couple of seconds...', uk:'Це займе кілька секунд...', de:'Das dauert ein paar Sekunden...', it:'Ci vorranno pochi secondi...', fr:'Cela prend quelques secondes...' },
+  notVisible:   { ru:'Не видно всего тела — встань чуть дальше от камеры', en:'Can\'t see your whole body — step a bit further', uk:'Не видно все тіло — відійди трохи далі', de:'Dein ganzer Körper ist nicht sichtbar', it:'Non si vede tutto il corpo', fr:'Le corps entier n\'est pas visible' },
+  tierPerfect:  { ru:'PERFECT!', en:'PERFECT!', uk:'PERFECT!', de:'PERFECT!', it:'PERFECT!', fr:'PERFECT!' },
+  tierGreat:    { ru:'GREAT!', en:'GREAT!', uk:'GREAT!', de:'GREAT!', it:'GREAT!', fr:'GREAT!' },
+  tierOk:       { ru:'OK!', en:'OK!', uk:'OK!', de:'OK!', it:'OK!', fr:'OK!' },
+  tierMiss:     { ru:'МИМО!', en:'MISS!', uk:'МИМО!', de:'VERFEHLT!', it:'MANCATO!', fr:'RATÉ!' },
+};
+
+function t(key){
+  const row = TR[key];
+  if (!row) return key;
+  return row[settings.lang] || row.ru;
+}
+
+function applyI18n(){
+  document.documentElement.lang = settings.lang;
+  $$('[data-i18n]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n')); });
+  $$('.lang-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-lang') === settings.lang));
+}
+
+const ARM_PHRASES = {
+  ru:{ up:['Руки вверх','Левая рука вверх','Правая рука вверх','Одна рука вверх'], side:['Руки в стороны','Левая рука в сторону','Правая рука в сторону','Одна рука в сторону'], forward:['Руки вперёд','Левая рука вперёд','Правая рука вперёд','Одна рука вперёд'], onHead:['Руки на голове','Левая рука на голове','Правая рука на голове','Одна рука на голове'], onHip:['Руки на талии','Левая рука на талии','Правая рука на талии','Одна рука на талии'], cross:['Руки скрещены','Левая рука скрещена','Правая рука скрещена','Рука скрещена'], behind:['Руки за спиной','Левая рука за спиной','Правая рука за спиной','Одна рука за спиной'], onShoulder:['Руки на плечах','Левая рука на плече','Правая рука на плече','Одна рука на плече'], v:['Руки буквой V','Левая рука вверх-в сторону','Правая рука вверх-в сторону','Одна рука вверх-в сторону'] },
+  en:{ up:['Arms up','Left arm up','Right arm up','One arm up'], side:['Arms out to the sides','Left arm out to the side','Right arm out to the side','One arm out to the side'], forward:['Arms forward','Left arm forward','Right arm forward','One arm forward'], onHead:['Hands on head','Left hand on head','Right hand on head','One hand on head'], onHip:['Hands on hips','Left hand on hip','Right hand on hip','One hand on hip'], cross:['Arms crossed','Left arm crossed','Right arm crossed','Arm crossed'], behind:['Hands behind back','Left hand behind back','Right hand behind back','One hand behind back'], onShoulder:['Hands on shoulders','Left hand on shoulder','Right hand on shoulder','One hand on shoulder'], v:['Arms in a V shape','Left arm up and out','Right arm up and out','One arm up and out'] },
+  uk:{ up:['Руки вгору','Ліва рука вгору','Права рука вгору','Одна рука вгору'], side:['Руки в сторони','Ліва рука в сторону','Права рука в сторону','Одна рука в сторону'], forward:['Руки вперед','Ліва рука вперед','Права рука вперед','Одна рука вперед'], onHead:['Руки на голові','Ліва рука на голові','Права рука на голові','Одна рука на голові'], onHip:['Руки на талії','Ліва рука на талії','Права рука на талії','Одна рука на талії'], cross:['Руки схрещені','Ліва рука схрещена','Права рука схрещена','Рука схрещена'], behind:['Руки за спиною','Ліва рука за спиною','Права рука за спиною','Одна рука за спиною'], onShoulder:['Руки на плечах','Ліва рука на плечі','Права рука на плечі','Одна рука на плечі'], v:['Руки літерою V','Ліва рука вгору-в сторону','Права рука вгору-в сторону','Одна рука вгору-в сторону'] },
+  de:{ up:['Arme hoch','Linker Arm hoch','Rechter Arm hoch','Ein Arm hoch'], side:['Arme zur Seite','Linker Arm zur Seite','Rechter Arm zur Seite','Ein Arm zur Seite'], forward:['Arme nach vorne','Linker Arm nach vorne','Rechter Arm nach vorne','Ein Arm nach vorne'], onHead:['Hände auf dem Kopf','Linke Hand auf dem Kopf','Rechte Hand auf dem Kopf','Eine Hand auf dem Kopf'], onHip:['Hände auf den Hüften','Linke Hand auf der Hüfte','Rechte Hand auf der Hüfte','Eine Hand auf der Hüfte'], cross:['Arme gekreuzt','Linker Arm gekreuzt','Rechter Arm gekreuzt','Arm gekreuzt'], behind:['Hände auf dem Rücken','Linke Hand auf dem Rücken','Rechte Hand auf dem Rücken','Eine Hand auf dem Rücken'], onShoulder:['Hände auf den Schultern','Linke Hand auf der Schulter','Rechte Hand auf der Schulter','Eine Hand auf der Schulter'], v:['Arme in V-Form','Linker Arm hoch-zur-Seite','Rechter Arm hoch-zur-Seite','Ein Arm hoch-zur-Seite'] },
+  it:{ up:['Braccia in alto','Braccio sinistro in alto','Braccio destro in alto','Un braccio in alto'], side:['Braccia di lato','Braccio sinistro di lato','Braccio destro di lato','Un braccio di lato'], forward:['Braccia in avanti','Braccio sinistro in avanti','Braccio destro in avanti','Un braccio in avanti'], onHead:['Mani sulla testa','Mano sinistra sulla testa','Mano destra sulla testa','Una mano sulla testa'], onHip:['Mani sui fianchi','Mano sinistra sul fianco','Mano destra sul fianco','Una mano sul fianco'], cross:['Braccia incrociate','Braccio sinistro incrociato','Braccio destro incrociato','Braccio incrociato'], behind:['Mani dietro la schiena','Mano sinistra dietro la schiena','Mano destra dietro la schiena','Una mano dietro la schiena'], onShoulder:['Mani sulle spalle','Mano sinistra sulla spalla','Mano destra sulla spalla','Una mano sulla spalla'], v:['Braccia a V','Braccio sinistro in alto e di lato','Braccio destro in alto e di lato','Un braccio in alto e di lato'] },
+  fr:{ up:['Bras en l\'air','Bras gauche en l\'air','Bras droit en l\'air','Un bras en l\'air'], side:['Bras écartés','Bras gauche sur le côté','Bras droit sur le côté','Un bras sur le côté'], forward:['Bras en avant','Bras gauche en avant','Bras droit en avant','Un bras en avant'], onHead:['Mains sur la tête','Main gauche sur la tête','Main droite sur la tête','Une main sur la tête'], onHip:['Mains sur les hanches','Main gauche sur la hanche','Main droite sur la hanche','Une main sur la hanche'], cross:['Bras croisés','Bras gauche croisé','Bras droit croisé','Bras croisé'], behind:['Mains derrière le dos','Main gauche derrière le dos','Main droite derrière le dos','Une main derrière le dos'], onShoulder:['Mains sur les épaules','Main gauche sur l\'épaule','Main droite sur l\'épaule','Une main sur l\'épaule'], v:['Bras en V','Bras gauche en haut et sur le côté','Bras droit en haut et sur le côté','Un bras en haut et sur le côté'] },
+};
+const SIDE_IDX = { both:0, left:1, right:2, one:3 };
+function armPhrase(lang, mode, side){
+  const table = ARM_PHRASES[lang] || ARM_PHRASES.ru;
+  const arr = table[mode] || ARM_PHRASES.ru[mode];
+  return arr[SIDE_IDX[side] !== undefined ? SIDE_IDX[side] : 0];
+}
+const OTHER_PHRASES = {
+  ru:{ legKnee:{right:'Поднять правое колено', left:'Поднять левое колено', either:'Поднять колено'}, stance:{wide:'Широкая стойка', narrow:'Узкая стойка'}, lean:{left:'Наклон влево', right:'Наклон вправо'}, squat:{shallow:'Присесть', deep:'Глубокий присед'}, kneel:{one:'Одно колено на пол', two:'Два колена на пол'}, lunge:{left:'Выпад влево', right:'Выпад вправо', forward:'Выпад вперёд'}, jump:'Прыжок', balance:{right:'Баланс на правой ноге', left:'Баланс на левой ноге', either:'Баланс на одной ноге'}, reach:'Рука к противоположной ноге', lower:{right:'Правая рука к полу', left:'Левая рука к полу', both:'Две руки к полу'}, bendForward:'Наклон вперёд', clap:'Хлопок', headTilt:{left:'Наклон головы влево', right:'Наклон головы вправо'}, motion:'Движение / шаг', freeze:'Замри на месте' },
+  en:{ legKnee:{right:'Raise right knee', left:'Raise left knee', either:'Raise a knee'}, stance:{wide:'Wide stance', narrow:'Narrow stance'}, lean:{left:'Lean left', right:'Lean right'}, squat:{shallow:'Squat', deep:'Deep squat'}, kneel:{one:'One knee down', two:'Both knees down'}, lunge:{left:'Lunge left', right:'Lunge right', forward:'Lunge forward'}, jump:'Jump', balance:{right:'Balance on right leg', left:'Balance on left leg', either:'Balance on one leg'}, reach:'Reach for opposite foot', lower:{right:'Right hand to floor', left:'Left hand to floor', both:'Both hands to floor'}, bendForward:'Bend forward', clap:'Clap', headTilt:{left:'Tilt head left', right:'Tilt head right'}, motion:'Move / step', freeze:'Freeze in place' },
+  uk:{ legKnee:{right:'Підняти праве коліно', left:'Підняти ліве коліно', either:'Підняти коліно'}, stance:{wide:'Широка стійка', narrow:'Вузька стійка'}, lean:{left:'Нахил вліво', right:'Нахил вправо'}, squat:{shallow:'Присісти', deep:'Глибокий присід'}, kneel:{one:'Одне коліно на підлогу', two:'Обидва коліна на підлогу'}, lunge:{left:'Випад вліво', right:'Випад вправо', forward:'Випад вперед'}, jump:'Стрибок', balance:{right:'Баланс на правій нозі', left:'Баланс на лівій нозі', either:'Баланс на одній нозі'}, reach:'Рука до протилежної ноги', lower:{right:'Права рука до підлоги', left:'Ліва рука до підлоги', both:'Обидві руки до підлоги'}, bendForward:'Нахил вперед', clap:'Оплеск', headTilt:{left:'Нахил голови вліво', right:'Нахил голови вправо'}, motion:'Рух / крок', freeze:'Завмри на місці' },
+  de:{ legKnee:{right:'Rechtes Knie heben', left:'Linkes Knie heben', either:'Ein Knie heben'}, stance:{wide:'Breiter Stand', narrow:'Enger Stand'}, lean:{left:'Nach links neigen', right:'Nach rechts neigen'}, squat:{shallow:'Hinhocken', deep:'Tiefe Kniebeuge'}, kneel:{one:'Ein Knie auf den Boden', two:'Beide Knie auf den Boden'}, lunge:{left:'Ausfallschritt links', right:'Ausfallschritt rechts', forward:'Ausfallschritt vorwärts'}, jump:'Sprung', balance:{right:'Balance auf dem rechten Bein', left:'Balance auf dem linken Bein', either:'Balance auf einem Bein'}, reach:'Hand zum gegenüberliegenden Fuß', lower:{right:'Rechte Hand zum Boden', left:'Linke Hand zum Boden', both:'Beide Hände zum Boden'}, bendForward:'Nach vorne beugen', clap:'Klatschen', headTilt:{left:'Kopf nach links neigen', right:'Kopf nach rechts neigen'}, motion:'Bewegung / Schritt', freeze:'Erstarren' },
+  it:{ legKnee:{right:'Alza il ginocchio destro', left:'Alza il ginocchio sinistro', either:'Alza un ginocchio'}, stance:{wide:'Posizione larga', narrow:'Posizione stretta'}, lean:{left:'Inclinati a sinistra', right:'Inclinati a destra'}, squat:{shallow:'Accovacciati', deep:'Squat profondo'}, kneel:{one:'Un ginocchio a terra', two:'Entrambe le ginocchia a terra'}, lunge:{left:'Affondo a sinistra', right:'Affondo a destra', forward:'Affondo in avanti'}, jump:'Salto', balance:{right:'Equilibrio sulla gamba destra', left:'Equilibrio sulla gamba sinistra', either:'Equilibrio su una gamba'}, reach:'Mano verso il piede opposto', lower:{right:'Mano destra a terra', left:'Mano sinistra a terra', both:'Entrambe le mani a terra'}, bendForward:'Piegati in avanti', clap:'Battito di mani', headTilt:{left:'Inclina la testa a sinistra', right:'Inclina la testa a destra'}, motion:'Movimento / passo', freeze:'Fermati sul posto' },
+  fr:{ legKnee:{right:'Lever le genou droit', left:'Lever le genou gauche', either:'Lever un genou'}, stance:{wide:'Position large', narrow:'Position étroite'}, lean:{left:'Pencher à gauche', right:'Pencher à droite'}, squat:{shallow:'S\'accroupir', deep:'Squat profond'}, kneel:{one:'Un genou au sol', two:'Les deux genoux au sol'}, lunge:{left:'Fente à gauche', right:'Fente à droite', forward:'Fente en avant'}, jump:'Saut', balance:{right:'Équilibre sur la jambe droite', left:'Équilibre sur la jambe gauche', either:'Équilibre sur une jambe'}, reach:'Main vers le pied opposé', lower:{right:'Main droite au sol', left:'Main gauche au sol', both:'Les deux mains au sol'}, bendForward:'Se pencher en avant', clap:'Applaudir', headTilt:{left:'Pencher la tête à gauche', right:'Pencher la tête à droite'}, motion:'Mouvement / pas', freeze:'Reste immobile' },
+};
+function poseLabel(spec, lang){
+  const L = OTHER_PHRASES[lang] || OTHER_PHRASES.ru;
+  const parts = [];
+  if (spec.arms) parts.push(armPhrase(lang, spec.arms[0], spec.arms[1]));
+  if (spec.legKnee) parts.push(L.legKnee[spec.legKnee] || L.legKnee.either);
+  if (spec.stance) parts.push(L.stance[spec.stance]);
+  if (spec.lean) parts.push(L.lean[spec.lean]);
+  if (spec.squat) parts.push(L.squat[spec.squat]);
+  if (spec.kneel) parts.push(L.kneel[spec.kneel]);
+  if (spec.lunge) parts.push(L.lunge[spec.lunge]);
+  if (spec.jump) parts.push(L.jump);
+  if (spec.balance) parts.push(L.balance[spec.balance]);
+  if (spec.reach) parts.push(L.reach);
+  if (spec.lower) parts.push(L.lower[spec.lower]);
+  if (spec.bendForward) parts.push(L.bendForward);
+  if (spec.clap) parts.push(L.clap);
+  if (spec.headTilt) parts.push(L.headTilt[spec.headTilt]);
+  if (spec.motion) parts.push(L.motion);
+  if (spec.freeze) parts.push(L.freeze);
+  return parts.join(' + ');
+}
+
+let session = { score:0, lives:3, level:1, combo:0, bestCombo:0, best:0 };
+
+function showScreen(id){
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._tm);
+  toast._tm = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+let actx = null;
+function beep(freq, dur=0.12, type='sine', gain=0.05){
+  if (!settings.sound) return;
+  try{
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g); g.connect(actx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    o.stop(actx.currentTime + dur + 0.02);
+  }catch(e){}
+}
+const sfx = {
+  hit: () => { beep(880,0.08,'triangle',0.06); setTimeout(()=>beep(1320,0.12,'triangle',0.06),70); },
+  miss: () => { beep(180,0.25,'sawtooth',0.05); },
+  tick: () => { beep(660,0.04,'square',0.02); },
+  levelup: () => { beep(660,0.08,'triangle',0.06); setTimeout(()=>beep(880,0.08,'triangle',0.06),90); setTimeout(()=>beep(1100,0.14,'triangle',0.06),180); },
+  ready: () => { beep(520,0.1,'sine',0.05); }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyI18n();
+  setTimeout(() => { showScreen('screen-menu'); }, 1600);
+
+  $$('.back, [data-target]').forEach(el => {
+    el.addEventListener('click', () => {
+      const target = el.getAttribute('data-target');
+      if (target) showScreen(target);
+    });
+  });
+
+  $$('[data-toast-key]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const key = el.getAttribute('data-toast-key');
+      if (key) { toast(t(key)); e.stopPropagation(); }
+    });
+  });
+
+  $$('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      settings.lang = btn.getAttribute('data-lang');
+      applyI18n();
+    });
+  });
+
+  $('#btn-play').addEventListener('click', () => showScreen('screen-mode'));
+  $('#btn-howto').addEventListener('click', () => showScreen('screen-howto'));
+  $('#btn-settings').addEventListener('click', () => showScreen('screen-settings'));
+
+  $$('[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.getAttribute('data-mode');
+      if (mode !== '1') return;
+      $$('[data-mode]').forEach(b => b.classList.remove('btn-selected'));
+      btn.classList.add('btn-selected');
+    });
+  });
+  $('#btn-mode-continue').addEventListener('click', () => startCameraFlow());
+
+  const wire = (id, key) => {
+    const el = $(id);
+    el.addEventListener('click', () => {
+      settings[key] = !settings[key];
+      el.classList.toggle('on', settings[key]);
+    });
+  };
+  wire('#sw-sound','sound');
+  wire('#sw-mirror','mirror');
+  wire('#sw-skeleton','skeleton');
+
+  $('#btn-cam-retry').addEventListener('click', () => startCameraFlow());
+  $('#btn-ready').addEventListener('click', onReadyPressed);
+
+  $('#btn-again').addEventListener('click', () => startCameraFlow());
+  $('#btn-to-menu').addEventListener('click', () => { stopAllStreams(); showScreen('screen-menu'); });
+});
+
+let detector = null;
+let modelReady = false;
+let libsLoaded = false;
+
+async function ensureModel(){
+  if (modelReady) return;
+  showScreen('screen-modelload');
+  await tf.setBackend('webgl');
+  await tf.ready();
+  detector = await poseDetection.createDetector(
+    poseDetection.SupportedModels.MoveNet,
+    { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING }
+  );
+  modelReady = true;
+}
+
+let stream = null;
+function stopAllStreams(){
+  if (stream){
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  cancelAnimationFrame(camLoopHandle);
+  cancelAnimationFrame(playLoopHandle);
+}
+
+// 3D Three.js инициализация сцены поверх камеры
+let threeScene, threeCamera, threeRenderer;
+let avatarJoints = [];
+let avatarBones = [];
+const BONE_PAIRS = [
+  [5,6],[5,7],[7,9],[6,8],[8,10],
+  [5,11],[6,12],[11,12],
+  [11,13],[13,15],[12,14],[14,16]
+];
+
+function init3DScene(canvasElement){
+  threeScene = new THREE.Scene();
+  threeCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  threeCamera.position.set(0, 0, 4.5);
+
+  threeRenderer = new THREE.WebGLRenderer({ canvas: canvasElement, alpha: true, antialias: true });
+  threeRenderer.setSize(canvasElement.clientWidth || window.innerWidth, canvasElement.clientHeight || window.innerHeight);
+  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+  threeScene.add(ambientLight);
+
+  avatarJoints = [];
+  const jointGeo = new THREE.SphereGeometry(0.08, 16, 16);
+  for (let i = 0; i < 17; i++) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x33ff9c, roughness: 0.2, metalness: 0.8, emissive: 0x114422 });
+    const mesh = new THREE.Mesh(jointGeo, mat);
+    mesh.visible = false;
+    threeScene.add(mesh);
+    avatarJoints.push(mesh);
+  }
+
+  avatarBones = [];
+  const boneMat = new THREE.LineBasicMaterial({ color: 0x3ea6ff, linewidth: 3 });
+  BONE_PAIRS.forEach(() => {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const line = new THREE.Line(geo, boneMat);
+    threeScene.add(line);
+    avatarBones.push(line);
+  });
+}
+
+function map2Dto3D(x, y, videoWidth, videoHeight) {
+  const nx = (1 - (x / videoWidth)) * 2 - 1;
+  const ny = -(y / videoHeight) * 2 + 1;
+  return new THREE.Vector3(nx * 2.2, ny * 1.9 - 0.1, 0);
+}
+
+function update3DAvatar(keypoints, videoWidth, videoHeight){
+  if (!settings.skeleton) {
+    avatarJoints.forEach(j => j.visible = false);
+    avatarBones.forEach(b => b.visible = false);
+    return;
+  }
+  keypoints.forEach((kp, idx) => {
+    if (kp.score > 0.35) {
+      const pos = map2Dto3D(kp.x, kp.y, videoWidth, videoHeight);
+      avatarJoints[idx].position.copy(pos);
+      avatarJoints[idx].visible = true;
+    } else {
+      avatarJoints[idx].visible = false;
+    }
+  });
+
+  BONE_PAIRS.forEach(([p1, p2], idx) => {
+    if (avatarJoints[p1].visible && avatarJoints[p2].visible) {
+      const pts = [avatarJoints[p1].position, avatarJoints[p2].position];
+      avatarBones[idx].geometry.setFromPoints(pts);
+      avatarBones[idx].visible = true;
+    } else {
+      avatarBones[idx].visible = false;
+    }
+  });
+  threeRenderer.render(threeScene, threeCamera);
+}
+
+async function startCameraFlow(){
+  session = { score:0, lives:3, level:1, combo:0, bestCombo:0, best: session.best };
+  try{
+    await ensureModel();
+  }catch(e){
+    showCamError('camErrorModel');
+    return;
+  }
+  showScreen('screen-camera');
+  bodyDetectedFrames = 0;
+  $('#btn-ready').disabled = true;
+  $('#btn-ready').style.opacity = .4;
+  setCamStatus(false, 'camSearching');
+
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} }, audio:false });
+  }catch(e){
+    showCamError('camErrorModel');
+    return;
+  }
+  const video = $('#video');
+  video.srcObject = stream;
+  await new Promise(res => { video.onloadedmetadata = () => { video.play(); res(); }; });
+
+  init3DScene($('#webgl-canvas'));
+  camDetectLoop(video);
+}
+
+function showCamError(key){
+  $('#camerror-text').textContent = t(key);
+  showScreen('screen-camerror');
+}
+
+function setCamStatus(ok, key){
+  $('#cam-dot').classList.toggle('ok', ok);
+  $('#cam-status-text').textContent = t(key);
+}
+
+let bodyDetectedFrames = 0;
+let lastKeypoints = null;
+let camLoopHandle = null;
+
+async function camDetectLoop(video){
+  if (!stream) return;
+  const poses = await safeEstimate(video);
+
+  if (poses && poses[0]){
+    lastKeypoints = poses[0].keypoints;
+    update3DAvatar(lastKeypoints, video.videoWidth, video.videoHeight);
+    const visible = bodyFullyVisible(lastKeypoints);
+    if (visible){
+      bodyDetectedFrames++;
+      setCamStatus(true, 'camDetected');
+    } else {
+      bodyDetectedFrames = 0;
+      setCamStatus(false, 'camStepBack');
+    }
+    const ready = bodyDetectedFrames > 12;
+    $('#btn-ready').disabled = !ready;
+    $('#btn-ready').style.opacity = ready ? 1 : .4;
+  } else {
+    bodyDetectedFrames = 0;
+    setCamStatus(false, 'camSearching');
+  }
+  camLoopHandle = requestAnimationFrame(() => camDetectLoop(video));
+}
+
+async function safeEstimate(video){
+  try{
+    if (video.readyState < 2) return null;
+    return await detector.estimatePoses(video, { flipHorizontal:false });
+  }catch(e){ return null; }
+}
+
+function kp(keypoints, name){
+  const k = keypoints.find(p => p.name === name);
+  if (!k || (k.score !== undefined && k.score < 0.35)) return null;
+  return k;
+}
+
+function bodyFullyVisible(keypoints){
+  const need = ['nose','left_shoulder','right_shoulder','left_hip','right_hip','left_ankle','right_ankle'];
+  return need.every(n => kp(keypoints, n));
+}
+
+let calib = null;
+function computeCalibration(keypoints){
+  const ls = kp(keypoints,'left_shoulder'), rs = kp(keypoints,'right_shoulder');
+  const lh = kp(keypoints,'left_hip'), rh = kp(keypoints,'right_hip');
+  const la = kp(keypoints,'left_ankle'), ra = kp(keypoints,'right_ankle');
+  if (!ls||!rs||!lh||!rh||!la||!ra) return null;
+  const shoulderWidth = Math.hypot(ls.x-rs.x, ls.y-rs.y);
+  const hipY = (lh.y+rh.y)/2;
+  const ankleY = (la.y+ra.y)/2;
+  const shoulderY = (ls.y+rs.y)/2;
+  const hipAnkle = ankleY - hipY;
+  const centerX = (ls.x+rs.x)/2;
+  const torsoLen = hipY - shoulderY;
+  return { shoulderWidth, hipY, hipAnkle, shoulderY, centerX, torsoLen };
+}
+
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+function buildKpSet(keypoints){
+  return {
+    nose: kp(keypoints,'nose'),
+    ls: kp(keypoints,'left_shoulder'), rs: kp(keypoints,'right_shoulder'),
+    lw: kp(keypoints,'left_wrist'),    rw: kp(keypoints,'right_wrist'),
+    lh: kp(keypoints,'left_hip'),      rh: kp(keypoints,'right_hip'),
+    lk: kp(keypoints,'left_knee'),     rk: kp(keypoints,'right_knee'),
+    la: kp(keypoints,'left_ankle'),    ra: kp(keypoints,'right_ankle'),
+    le: kp(keypoints,'left_ear'),      re: kp(keypoints,'right_ear'),
+  };
+}
+
+function armSubScore(mode, side, K, cal){
+  const wrist = side==='left' ? K.lw : K.rw;
+  const shoulder = side==='left' ? K.ls : K.rs;
+  const oppShoulder = side==='left' ? K.rs : K.ls;
+  const hip = side==='left' ? K.lh : K.rh;
+  if (!wrist||!shoulder) return 0;
+  const sw = cal.shoulderWidth || 1;
+  switch(mode){
+    case 'up': return clamp01((shoulder.y - wrist.y) / (sw*0.55));
+    case 'side': {
+      const out = clamp01(Math.abs(wrist.x-shoulder.x) / (sw*0.85));
+      const level = 1 - clamp01(Math.abs(wrist.y-shoulder.y) / (sw*0.9));
+      return avg([out, level]);
+    }
+    case 'v': {
+      const upS = clamp01((shoulder.y - wrist.y) / (sw*0.5));
+      const out = clamp01(Math.abs(wrist.x-shoulder.x) / (sw*0.7));
+      return avg([upS, out]);
+    }
+    case 'forward': {
+      if (!K.ls||!K.rs) return 0;
+      const cx = (K.ls.x+K.rs.x)/2;
+      const closeX = 1 - clamp01(Math.abs(wrist.x-cx) / (sw*0.7));
+      const midY = hip ? (shoulder.y+hip.y)/2 : shoulder.y + sw*0.4;
+      const rangeY = 1 - clamp01(Math.abs(wrist.y-midY) / (sw*0.95));
+      return avg([closeX, rangeY]);
+    }
+    case 'onHead': return K.nose ? 1 - clamp01(dist(wrist,K.nose) / (sw*0.85)) : 0;
+    case 'onHip': return hip ? 1 - clamp01(dist(wrist,hip) / (sw*0.65)) : 0;
+    case 'cross': return oppShoulder ? 1 - clamp01(dist(wrist,oppShoulder) / (sw*0.75)) : 0;
+    case 'onShoulder': {
+      const a = 1 - clamp01(dist(wrist,shoulder) / (sw*0.55));
+      const b = oppShoulder ? 1 - clamp01(dist(wrist,oppShoulder) / (sw*0.55)) : 0;
+      return Math.max(a,b);
+    }
+    case 'behind': return hip ? 1 - clamp01(dist(wrist,hip) / (sw*0.8)) : 0;
+    default: return 0;
+  }
+}
+
+function armScore(spec, K, cal){
+  const [mode, side] = spec;
+  if (side==='both') return avg([armSubScore(mode,'left',K,cal), armSubScore(mode,'right',K,cal)]);
+  if (side==='one')  return Math.max(armSubScore(mode,'left',K,cal), armSubScore(mode,'right',K,cal));
+  return armSubScore(mode, side, K, cal);
+}
+
+function legKneeUpScore(side, K, cal, factor){
+  factor = factor || 0.42;
+  const knee = side==='left' ? K.lk : K.rk;
+  const hip = side==='left' ? K.lh : K.rh;
+  if (!knee||!hip||!cal.hipAnkle) return 0;
+  const diff = hip.y - knee.y;
+  return clamp01(1 - diff/(cal.hipAnkle*factor));
+}
+
+function stanceScore(width, K, cal){
+  if (!K.la||!K.ra) return 0;
+  const ratio = Math.abs(K.la.x-K.ra.x) / (cal.shoulderWidth||1);
+  if (width==='narrow') return clamp01(1 - (ratio-0.3)/0.5);
+  if (width==='wide')   return clamp01((ratio-1.1)/0.9);
+  return 0;
+}
+
+function leanScore(side, K, cal){
+  if (!K.ls||!K.rs||!cal.centerX) return 0;
+  const curCenter = (K.ls.x+K.rs.x)/2;
+  const offset = curCenter - cal.centerX;
+  const sw = cal.shoulderWidth||1;
+  const mag = clamp01(Math.abs(offset) / (sw*0.5));
+  if (side==='left')  return offset < -sw*0.08 ? mag : 0;
+  if (side==='right') return offset >  sw*0.08 ? mag : 0;
+  return 0;
+}
+
+function squatScore(level, K, cal){
+  if (!K.lh||!K.rh||!K.la||!K.ra||!cal.hipAnkle) return 0;
+  const hipY=(K.lh.y+K.rh.y)/2, ankleY=(K.la.y+K.ra.y)/2;
+  const ratio = (ankleY-hipY) / cal.hipAnkle;
+  if (level==='shallow') return clamp01((1-ratio-0.12)/0.28);
+  if (level==='deep')    return clamp01((1-ratio-0.32)/0.30);
+  return 0;
+}
+
+function kneelScore(count, K, cal){
+  const deep = squatScore('deep', K, cal);
+  if (!K.lk||!K.rk) return deep;
+  const asym = Math.abs(K.lk.y-K.rk.y) / (cal.shoulderWidth||1);
+  if (count==='two') return avg([deep, clamp01(1-asym/0.3)]);
+  if (count==='one') return avg([deep, clamp01(asym/0.25)]);
+  return deep;
+}
+
+function lungeScore(side, K, cal){
+  const stanceW = stanceScore('wide', K, cal);
+  let dirScore = 1;
+  if ((side==='left'||side==='right') && K.la && K.ra && cal.centerX){
+    const curCenter = (K.la.x+K.ra.x)/2;
+    const offset = curCenter - cal.centerX;
+    const sw = cal.shoulderWidth||1;
+    dirScore = side==='left' ? clamp01((-offset)/(sw*0.4)+0.5) : clamp01((offset)/(sw*0.4)+0.5);
+  }
+  return avg([stanceW, dirScore]);
+}
+
+function jumpScore(K, cal){
+  if (!K.lh||!K.rh) return 0;
+  const hipY = (K.lh.y+K.rh.y)/2;
+  const sw = cal.shoulderWidth||1;
+  return clamp01((cal.hipY - hipY) / (sw*0.35));
+}
+
+function reachScore(K, cal){
+  const sw = cal.shoulderWidth||1;
+  const cands = [];
+  if (K.lw&&K.ra) cands.push(dist(K.lw,K.ra));
+  if (K.rw&&K.la) cands.push(dist(K.rw,K.la));
+  if (!cands.length) return 0;
+  const closeness = 1 - clamp01(Math.min(...cands) / (sw*0.9));
+  let bendScore = 0;
+  if (K.ls&&K.rs&&K.lh&&K.rh&&cal.torsoLen){
+    const curTorso = ((K.lh.y+K.rh.y)/2) - ((K.ls.y+K.rs.y)/2);
+    bendScore = clamp01(1 - curTorso/cal.torsoLen);
+  }
+  return avg([closeness, bendScore]);
+}
+
+function lowerScore(side, K, cal){
+  const sw = cal.shoulderWidth||1;
+  const check = (wrist,hip) => (!wrist||!hip) ? 0 : clamp01((wrist.y-hip.y)/(sw*0.9));
+  if (side==='both') return avg([check(K.lw,K.lh), check(K.rw,K.rh)]);
+  if (side==='left')  return check(K.lw,K.lh);
+  if (side==='right') return check(K.rw,K.rh);
+  return 0;
+}
+
+function bendForwardScore(K, cal){
+  if (!K.ls||!K.rs||!K.lh||!K.rh||!cal.torsoLen) return 0;
+  const curTorso = ((K.lh.y+K.rh.y)/2) - ((K.ls.y+K.rs.y)/2);
+  return clamp01((1 - curTorso/cal.torsoLen)/0.75);
+}
+
+function clapScore(K, cal){
+  if (!K.lw||!K.rw||!K.ls||!K.rs) return 0;
+  const sw = cal.shoulderWidth||1;
+  const close = 1 - clamp01(dist(K.lw,K.rw) / (sw*0.35));
+  const midY = (K.ls.y+K.rs.y)/2 + sw*0.15;
+  const heightOk = 1 - clamp01(Math.abs(((K.lw.y+K.rw.y)/2) - midY) / (sw*0.6));
+  return avg([close, heightOk]);
+}
+
+function headTiltScore(side, K, cal){
+  if (!K.le||!K.re) return 0;
+  const diff = K.le.y - K.re.y;
+  const sw = cal.shoulderWidth||1;
+  const mag = clamp01(Math.abs(diff) / (sw*0.25));
+  if (side==='right') return diff < 0 ? mag : 0;
+  if (side==='left')  return diff > 0 ? mag : 0;
+  return 0;
+}
+
+let motionEnergy = 0;
+let prevMotionKp = null;
+function updateMotionEnergy(keypoints){
+  const names = ['left_wrist','right_wrist','left_ankle','right_ankle'];
+  if (prevMotionKp){
+    let total=0, count=0;
+    names.forEach(n => {
+      const a = kp(keypoints,n), b = prevMotionKp[n];
+      if (a&&b){ total += Math.hypot(a.x-b.x, a.y-b.y); count++; }
+    });
+    if (count) motionEnergy = motionEnergy*0.8 + (total/count)*0.2;
+  }
+  prevMotionKp = {};
+  names.forEach(n => { prevMotionKp[n] = kp(keypoints,n); });
+}
+
+function evalSpec(spec, K, cal){
+  const s = [];
+  if (spec.arms)     s.push(armScore(spec.arms, K, cal));
+  if (spec.legKnee)  s.push(spec.legKnee==='either' ? Math.max(legKneeUpScore('left',K,cal), legKneeUpScore('right',K,cal)) : legKneeUpScore(spec.legKnee,K,cal));
+  if (spec.stance)   s.push(stanceScore(spec.stance, K, cal));
+  if (spec.lean)     s.push(leanScore(spec.lean, K, cal));
+  if (spec.squat)    s.push(squatScore(spec.squat, K, cal));
+  if (spec.kneel)    s.push(kneelScore(spec.kneel, K, cal));
+  if (spec.lunge)    s.push(lungeScore(spec.lunge, K, cal));
+  if (spec.jump)     s.push(jumpScore(K, cal));
+  if (spec.balance)  s.push(spec.balance==='either' ? Math.max(legKneeUpScore('left',K,cal,0.55), legKneeUpScore('right',K,cal,0.55)) : legKneeUpScore(spec.balance,K,cal,0.55));
+  if (spec.reach)    s.push(reachScore(K, cal));
+  if (spec.lower)    s.push(lowerScore(spec.lower, K, cal));
+  if (spec.bendForward) s.push(bendForwardScore(K, cal));
+  if (spec.clap)     s.push(clapScore(K, cal));
+  if (spec.headTilt) s.push(headTiltScore(spec.headTilt, K, cal));
+  const sw = cal.shoulderWidth || 1;
+  if (spec.motion)   s.push(clamp01(motionEnergy/(sw*0.05)));
+  if (spec.freeze)   s.push(1 - clamp01(motionEnergy/(sw*0.05)));
+  return s.length ? avg(s)*100 : 0;
+}
+
+function matchScorePct(spec, keypoints, cal){
+  if (!cal) return 0;
+  return evalSpec(spec, buildKpSet(keypoints), cal);
+}
+
+function iconSvg(inner){ return `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">${inner}</svg>`; }
+function iconFreeze(){ return iconSvg(`<circle cx="20" cy="8" r="4" fill="currentColor"/><line x1="20" y1="12" x2="20" y2="26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="5" y1="15" x2="35" y2="15" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="26" x2="11" y2="37" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="26" x2="29" y2="37" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`); }
+function iconLow(){ return iconSvg(`<circle cx="20" cy="10" r="4" fill="currentColor"/><line x1="20" y1="14" x2="20" y2="23" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="16" x2="9" y2="12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="16" x2="31" y2="12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="23" x2="12" y2="29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="12" y1="29" x2="14" y2="37" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="23" x2="28" y2="29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="28" y1="29" x2="26" y2="37" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`); }
+function iconJump(){ return iconSvg(`<circle cx="20" cy="7" r="4" fill="currentColor"/><line x1="20" y1="11" x2="20" y2="24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="13" x2="10" y2="6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="13" x2="30" y2="6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="24" x2="12" y2="33" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="24" x2="28" y2="33" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`); }
+function iconMove(){ return iconSvg(`<circle cx="20" cy="8" r="4" fill="currentColor"/><line x1="20" y1="12" x2="18" y2="24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="14" x2="10" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="14" x2="30" y2="20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="18" y1="24" x2="8" y2="30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="18" y1="24" x2="28" y2="36" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`); }
+
+const CATEGORY_META = {
+  red:    { color:'--red',    icon:iconFreeze },
+  green:  { color:'--green',  icon:iconMove   },
+  yellow: { color:'--yellow', icon:iconJump   },
+  blue:   { color:'--blue',   icon:iconLow    },
+};
+
+const POSE_TABLE = [
+  [1,'red','Руки вверх',{arms:['up','both']}],
+  [2,'red','Руки в стороны',{arms:['side','both']}],
+  [3,'red','Правая рука вверх',{arms:['up','right']}],
+  [4,'red','Левая рука вверх',{arms:['up','left']}],
+  [5,'red','Руки на голове',{arms:['onHead','both']}],
+  [6,'red','Руки на талии',{arms:['onHip','both']}],
+  [7,'red','Скрестить руки',{arms:['cross','both']}],
+  [8,'red','Правая рука вперёд',{arms:['forward','right']}],
+  [9,'red','Левая рука вперёд',{arms:['forward','left']}],
+  [10,'red','Две руки вперёд',{arms:['forward','both']}],
+  [11,'red','Руки буквой V',{arms:['v','both']}],
+  [12,'red','Руки буквой T',{arms:['side','both']}],
+  [13,'red','Правая рука в сторону',{arms:['side','right']}],
+  [14,'red','Левая рука в сторону',{arms:['side','left']}],
+  [15,'red','Руки за спину',{arms:['behind','both']}],
+  [16,'red','Ладони перед собой',{arms:['forward','both']}],
+  [17,'red','Поза супергероя',{arms:['onHip','both'], stance:'wide'}],
+  [18,'red','Поза робота',{arms:['forward','both']}],
+  [19,'red','Поза боксёра',{arms:['onHead','both']}],
+  [20,'red','Поза танцора',{arms:['v','both']}],
+  [21,'red','Наклон головы вправо',{headTilt:'right'}],
+  [22,'red','Наклон головы влево',{headTilt:'left'}],
+  [23,'red','Одна рука на голове',{arms:['onHead','one']}],
+  [24,'red','Две руки на плечах',{arms:['onShoulder','both']}],
+  [25,'red','Своя смешная Freeze-поза',{freeze:true}],
+
+  [26,'green','Шаг вперёд',{motion:true}],
+  [27,'green','Шаг назад',{motion:true}],
+  [28,'green','Шаг влево',{lean:'left'}],
+  [29,'green','Шаг вправо',{lean:'right'}],
+  [30,'green','Два шага вперёд',{motion:true}],
+  [31,'green','Два шага назад',{motion:true}],
+  [32,'green','Поворот влево',{motion:true}],
+  [33,'green','Поворот вправо',{motion:true}],
+  [34,'green','Пол-оборота',{motion:true}],
+  [35,'green','Шаг + руки вверх',{arms:['up','both'], motion:true}],
+  [36,'green','Шаг + руки в стороны',{arms:['side','both'], motion:true}],
+  [37,'green','Идти на месте',{motion:true}],
+  [38,'green','Поднять правое колено',{legKnee:'right'}],
+  [39,'green','Поднять левое колено',{legKnee:'left'}],
+  [40,'green','Руки вверх-вниз',{motion:true}],
+  [41,'green','Руки в стороны-вниз',{motion:true}],
+  [42,'green','Правый шаг + хлопок',{clap:true, motion:true}],
+  [43,'green','Левый шаг + хлопок',{clap:true, motion:true}],
+  [44,'green','Два шага в стороны',{motion:true}],
+  [45,'green','Движение руками вперёд',{arms:['forward','both'], motion:true}],
+  [46,'green','Движение руками назад',{motion:true}],
+  [47,'green','Шаг + поворот',{motion:true}],
+  [48,'green','Танцевальный шаг',{motion:true}],
+  [49,'green','Быстрый шаг в сторону',{motion:true}],
+  [50,'green','Быстро поменять сторону',{motion:true}],
+
+  [51,'yellow','Прыжок вверх',{jump:true}],
+  [52,'yellow','Прыжок ноги вместе',{jump:true, stance:'narrow'}],
+  [53,'yellow','Прыжок ноги в стороны',{jump:true, stance:'wide'}],
+  [54,'yellow','Прыжок влево',{jump:true}],
+  [55,'yellow','Прыжок вправо',{jump:true}],
+  [56,'yellow','Прыжок вперёд',{jump:true}],
+  [57,'yellow','Прыжок назад',{jump:true}],
+  [58,'yellow','На правой ноге',{balance:'right'}],
+  [59,'yellow','На левой ноге',{balance:'left'}],
+  [60,'yellow','Баланс + руки в стороны',{balance:'either', arms:['side','both']}],
+  [61,'yellow','Правая нога вперёд',{legKnee:'right'}],
+  [62,'yellow','Левая нога вперёд',{legKnee:'left'}],
+  [63,'yellow','Правая нога назад',{legKnee:'right'}],
+  [64,'yellow','Левая нога назад',{legKnee:'left'}],
+  [65,'yellow','Баланс + рука вверх',{balance:'either', arms:['up','one']}],
+  [66,'yellow','Баланс + две руки вверх',{balance:'either', arms:['up','both']}],
+  [67,'yellow','Прыжок + руки вверх',{jump:true, arms:['up','both']}],
+  [68,'yellow','Прыжок + руки в стороны',{jump:true, arms:['side','both']}],
+  [69,'yellow','Прыжок + поворот',{jump:true}],
+  [70,'yellow','Прыжок с хлопком',{jump:true, clap:true}],
+  [71,'yellow','Баланс «самолёт»',{balance:'either', bendForward:true}],
+  [72,'yellow','Баланс «дерево»',{balance:'either'}],
+  [73,'yellow','Нога в сторону',{legKnee:'either'}],
+  [74,'yellow','Колено вверх + руки вверх',{legKnee:'either', arms:['up','both']}],
+  [75,'yellow','Сложная баланс-поза',{balance:'either', arms:['v','both']}],
+
+  [76,'blue','Присесть',{squat:'shallow'}],
+  [77,'blue','Глубокий присед',{squat:'deep'}],
+  [78,'blue','Одно колено вниз',{kneel:'one'}],
+  [79,'blue','Два колена вниз',{kneel:'two'}],
+  [80,'blue','Правая рука к полу',{lower:'right'}],
+  [81,'blue','Левая рука к полу',{lower:'left'}],
+  [82,'blue','Две руки к полу',{lower:'both'}],
+  [83,'blue','Наклон вперёд',{bendForward:true}],
+  [84,'blue','Наклон влево',{lean:'left'}],
+  [85,'blue','Наклон вправо',{lean:'right'}],
+  [86,'blue','Присед + руки вверх',{squat:'shallow', arms:['up','both']}],
+  [87,'blue','Присед + руки вперёд',{squat:'shallow', arms:['forward','both']}],
+  [88,'blue','Присед + руки в стороны',{squat:'shallow', arms:['side','both']}],
+  [89,'blue','Выпад вправо',{lunge:'right'}],
+  [90,'blue','Выпад влево',{lunge:'left'}],
+  [91,'blue','Выпад вперёд',{lunge:'forward'}],
+  [92,'blue','Низкая широкая стойка',{squat:'shallow', stance:'wide'}],
+  [93,'blue','Сесть на одно колено',{kneel:'one'}],
+  [94,'blue','Рука к противоположной ноге',{reach:true}],
+  [95,'blue','Другая рука к ноге',{reach:true}],
+  [96,'blue','Низкая поза супергероя',{squat:'shallow', arms:['onHip','both']}],
+  [97,'blue','Низкая поза робота',{squat:'shallow', arms:['forward','both']}],
+  [98,'blue','Присед с поворотом',{squat:'shallow', motion:true}],
+  [99,'blue','Низкая поза + одна рука вверх',{squat:'shallow', arms:['up','one']}],
+  [100,'blue','Финальная низкая поза',{squat:'deep', arms:['v','both']}],
+];
+
+const POSES = POSE_TABLE.map(([num,cat,label,spec]) => ({
+  id:'p'+num, num, cat, label, spec,
+  color: CATEGORY_META[cat].color,
+  icon: CATEGORY_META[cat].icon,
+}));
+
+function poolForLevel(level){
+  if (level<=1) return POSES.filter(p => p.cat==='red' || p.cat==='blue');
+  if (level<=3) return POSES.filter(p => p.cat!=='green');
+  return POSES;
+}
+
+function gradeTier(pct){
+  if (pct>=90) return { i18n:'tierPerfect', pts:150, key:'good' };
+  if (pct>=75) return { i18n:'tierGreat',   pts:110, key:'great' };
+  return          { i18n:'tierOk',       pts:70,  key:'ok' };
+}
+const OK_THRESHOLD = 60;
+
+async function onReadyPressed(){
+  if (!lastKeypoints) return;
+  calib = computeCalibration(lastKeypoints);
+  if (!calib){ toast(t('notVisible')); return; }
+  sfx.ready();
+  cancelAnimationFrame(camLoopHandle);
+  if (stream) stream.getTracks().forEach(t=>t.stop());
+  stream = null;
+  runCountdown();
+}
+
+function runCountdown(){
+  showScreen('screen-countdown');
+  let n = 3;
+  $('#cd-number').textContent = n;
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0){
+      clearInterval(iv);
+      startGameplay();
+      return;
+    }
+    $('#cd-number').textContent = n;
+    sfx.tick();
+  }, 800);
+}
+
+let playLoopHandle = null;
+let currentPose = null;
+let poseDeadline = 0;
+let poseDuration = 4.0;
+let holdSamples = [];
+const HOLD_NEEDED = 0.4;
+
+async function startGameplay(){
+  updateHud();
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} }, audio:false });
+  }catch(e){
+    showCamError('camErrorModel');
+    return;
+  }
+  const video = $('#video2');
+  video.srcObject = stream;
+  await new Promise(res => { video.onloadedmetadata = () => { video.play(); res(); }; });
+
+  init3DScene($('#webgl-canvas2'));
+
+  motionEnergy = 0; prevMotionKp = null;
+  showScreen('screen-play');
+  nextPose();
+  playLoop(video);
+}
+
+function updateHud(){
+  $('#hud-score').textContent = session.score;
+  $('#hud-level').textContent = session.level;
+  const hearts = $('#hud-hearts');
+  hearts.innerHTML = '';
+  for (let i=0;i<3;i++){
+    const full = i < session.lives;
+    hearts.insertAdjacentHTML('beforeend', `<svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.7-10-9.3C0.3 8.2 2 4.5 5.6 4c2-.3 3.7.7 4.4 2.2C10.7 4.7 12.4 3.7 14.4 4c3.6.5 5.3 4.2 3.6 7.7C19.5 16.3 12 21 12 21z" fill="${full?'#ff3b5c':'none'}" stroke="${full?'#ff3b5c':'#454b64'}" stroke-width="1.6"/></svg>`);
+  }
+}
+
+function poseGlowRgba(cat){
+  const map = {
+    red:'rgba(255,59,92,.22)',
+    green:'rgba(51,255,156,.20)',
+    yellow:'rgba(255,207,57,.20)',
+    blue:'rgba(62,166,255,.22)'
+  };
+  return map[cat] || 'rgba(62,166,255,.20)';
+}
+
+function nextPose(){
+  const pool = poolForLevel(session.level);
+  let choice;
+  do { choice = pool[Math.floor(Math.random()*pool.length)]; } while (choice.id === (currentPose && currentPose.id) && pool.length>1);
+  currentPose = choice;
+  holdSamples = [];
+  poseDuration = Math.max(2.2, 4.6 - (session.level-1)*0.22);
+  poseDeadline = performance.now() + poseDuration*1000;
+
+  const card = $('#pose-card');
+  card.style.setProperty('--pose-color', `var(${currentPose.color})`);
+  const playStage = $('.play-stage');
+  if (playStage){
+    playStage.style.setProperty('--pose-color', `var(${currentPose.color})`);
+    playStage.style.boxShadow = `0 18px 55px ${poseGlowRgba(currentPose.cat)}, 0 18px 50px rgba(0,0,0,.35)`;
+  }
+  $('#pose-ico').innerHTML = currentPose.icon();
+  $('#pose-text').textContent = '#' + currentPose.num + ' ' + poseLabel(currentPose.spec, settings.lang);
+  $('#match-fill').style.width = '0%';
+  const pctEl = $('#match-pct'); if (pctEl) pctEl.textContent = '0%';
+}
+
+function endRound(success, tier){
+  if (success){
+    session.combo++;
+    session.bestCombo = Math.max(session.bestCombo, session.combo);
+    const mult = 1 + Math.min(session.combo-1, 8)*0.12;
+    const pts = Math.round(tier.pts*mult);
+    session.score += pts;
+    if (session.combo>0 && session.combo % 5 === 0){
+      session.level++;
+      sfx.levelup();
+    } else {
+      sfx.hit();
+    }
+    flash(tier, pts);
+    showCombo();
+  } else {
+    session.combo = 0;
+    session.lives--;
+    sfx.miss();
+    flash(null, 0);
+  }
+  updateHud();
+  if (session.lives <= 0){
+    setTimeout(() => endGame(), 750);
+    return;
+  }
+  setTimeout(() => nextPose(), 750);
+}
+
+function flash(tier, pts){
+  const el = $('#flash-msg');
+  const titleEl = $('#flash-title');
+  if (tier){
+    titleEl.textContent = t(tier.i18n);
+    titleEl.className = 'flash-title ' + tier.key;
+    $('#flash-points').textContent = '+' + pts;
+    $('#flash-points').style.display = 'block';
+  } else {
+    titleEl.textContent = t('tierMiss');
+    titleEl.className = 'flash-title bad';
+    $('#flash-points').style.display = 'none';
+  }
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  setTimeout(()=> el.classList.remove('show'), 650);
+}
+
+function showCombo(){
+  if (session.combo < 2) return;
+  const el = $('#combo-pill');
+  el.textContent = 'COMBO ×' + session.combo;
+  el.classList.add('show');
+  clearTimeout(showCombo._t);
+  showCombo._t = setTimeout(()=> el.classList.remove('show'), 900);
+}
+
+async function playLoop(video){
+  if (!stream) return;
+  const poses = await safeEstimate(video);
+
+  if (poses && poses[0]){
+    const keypoints = poses[0].keypoints;
+    updateMotionEnergy(keypoints);
+    update3DAvatar(keypoints, video.videoWidth, video.videoHeight);
+
+    const score = matchScorePct(currentPose.spec, keypoints, calib);
+    $('#match-fill').style.width = Math.round(score)+'%';
+    const pctEl = $('#match-pct'); if (pctEl) pctEl.textContent = Math.round(score)+'%';
+
+    const now = performance.now();
+    if (score >= OK_THRESHOLD){
+      holdSamples.push({ t:now, s:score });
+    } else {
+      holdSamples = [];
+    }
+    if (holdSamples.length && (now - holdSamples[0].t) >= HOLD_NEEDED*1000){
+      const avgScore = avg(holdSamples.map(h=>h.s));
+      const tier = gradeTier(avgScore);
+      holdSamples = [];
+      endRound(true, tier);
+      playLoopHandle = requestAnimationFrame(() => playLoop(video));
+      return;
+    }
+  }
+
+  const remainMs = poseDeadline - performance.now();
+  const remain = Math.max(0, remainMs/1000);
+  $('#timer-num').textContent = remain.toFixed(1);
+  $('#timer-fill').style.width = Math.max(0, (remain/poseDuration)*100) + '%';
+
+  if (remainMs <= 0){
+    endRound(false, null);
+  }
+
+  playLoopHandle = requestAnimationFrame(() => playLoop(video));
+}
+
+function endGame(){
+  stopAllStreams();
+  session.best = Math.max(session.best, session.score);
+  $('#result-score').textContent = session.score;
+  $('#result-level').textContent = session.level;
+  $('#result-combo').textContent = session.bestCombo;
+  $('#result-best').textContent = session.best;
+  showScreen('screen-result');
+}
+</script>
+</body>
+</html>
+
+<style>
+#screen-splash .splash-top{
+  gap:0;
+}
+#screen-splash .splash-top > div[style="position:relative"]{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+#screen-splash .logo-word{
+  font-size:64px;
+  letter-spacing:2px;
+}
+#screen-splash .logo-sub{
+  font-size:39px;
+  margin-top:2px;
+  letter-spacing:5px;
+  text-align:center;
+}
+#screen-splash .logo-word span{
+  text-shadow:0 0 14px currentColor, 0 0 30px rgba(255,255,255,.06);
+}
+@media (max-width:390px){
+  #screen-splash .logo-word{font-size:56px;}
+  #screen-splash .logo-sub{font-size:34px; letter-spacing:4px;}
+}
+</style>
