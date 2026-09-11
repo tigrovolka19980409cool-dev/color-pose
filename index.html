@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b18">
+<title>COLOR POSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<style>
+:root{
+  --bg:#060914;--panel:rgba(14,20,39,.72);--panel2:rgba(22,30,56,.82);
+  --text:#f6f8ff;--muted:#94a0c3;--line:rgba(125,145,210,.18);
+  --red:#ff3b5c;--yellow:#ffcc3a;--green:#37f39a;--blue:#42a5ff;--violet:#b472ff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:#060914;color:var(--text);font-family:Inter,sans-serif}
+body{overflow:hidden}
+body:before,body:after{content:"";position:fixed;width:58vmax;height:58vmax;border-radius:50%;filter:blur(70px);opacity:.22;pointer-events:none}
+body:before{left:-22vmax;top:-20vmax;background:radial-gradient(circle,var(--blue),transparent 66%);animation:drift1 10s ease-in-out infinite alternate}
+body:after{right:-24vmax;bottom:-22vmax;background:radial-gradient(circle,var(--green),transparent 66%);animation:drift2 13s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(8vmax,5vmax) scale(1.08)}}
+@keyframes drift2{to{transform:translate(-7vmax,-4vmax) scale(.95)}}
+#app{position:relative;width:100vw;height:100dvh}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}
+.screen.active{display:flex}
+.center{align-items:center;justify-content:center}
+.logo{font-family:"Space Grotesk",sans-serif;font-weight:700;text-align:center;line-height:.95;letter-spacing:1px}
+.logo .color{font-size:64px;filter:drop-shadow(0 0 22px rgba(80,120,255,.25))}
+.logo .pose{font-size:38px;letter-spacing:6px;margin-top:8px}
+.c1{color:var(--red)}.c2{color:var(--yellow)}.c3{color:var(--green)}.c4{color:var(--blue)}.c5{color:var(--violet)}
+.loader{position:absolute;left:50%;bottom:max(62px,calc(env(safe-area-inset-bottom) + 48px));transform:translateX(-50%);width:220px}
+.track{height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+.fill{height:100%;width:28%;border-radius:99px;background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue),var(--violet));animation:load 1.5s ease-in-out infinite}
+@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(430%)}}
+.loading{margin-top:12px;text-align:center;font-size:11px;letter-spacing:3px;color:var(--muted)}
+.hero{flex:1;display:flex;align-items:center;justify-content:center}
+.menu{display:flex;flex-direction:column;gap:13px}
+.btn{border:1px solid var(--line);border-radius:20px;padding:17px 18px;background:linear-gradient(180deg,rgba(25,34,62,.78),rgba(11,16,31,.82));color:var(--text);font-weight:700;font-size:16px;backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 14px 28px rgba(0,0,0,.2)}
+.btn.primary{background:linear-gradient(135deg,#23e98b,#35ffa0 45%,#3bc8ff);color:#04130b;border-color:rgba(255,255,255,.25);letter-spacing:2px}
+.btn:active{transform:scale(.98)}
+.bottom-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.tile{padding:14px 8px;border-radius:18px;text-align:center;border:1px solid var(--line);background:rgba(15,21,40,.68);color:#aab4d4;font-size:11px;font-weight:700}
+.tile b{display:block;width:34px;height:34px;line-height:34px;border-radius:11px;margin:0 auto 8px;background:linear-gradient(145deg,rgba(66,165,255,.22),rgba(180,114,255,.16));color:#e8edff;font-size:10px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.back{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:rgba(16,23,44,.8);position:relative}
+.back:before{content:"";position:absolute;width:10px;height:10px;border-left:2px solid #e4eaff;border-bottom:2px solid #e4eaff;transform:rotate(45deg);left:16px;top:14px}
+h2{margin:0;font:700 22px "Space Grotesk",sans-serif}
+.mode-list{display:flex;flex-direction:column;gap:14px}
+.mode{display:flex;align-items:center;gap:15px;padding:17px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(24,32,58,.8),rgba(12,17,33,.82))}
+.mode.active{border-color:var(--blue);box-shadow:0 0 28px rgba(66,165,255,.13)}
+.mode-num{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(66,165,255,.22),rgba(180,114,255,.16));font:700 13px "Space Grotesk",sans-serif}
+.mode .title{font-weight:700}.mode .sub{font-size:13px;color:var(--muted);margin-top:3px}
+.spacer{flex:1}
+.cam-head{text-align:center;margin-bottom:12px}.cam-head p{margin:5px 0 0;color:var(--muted);font-size:12px}
+.stage{position:relative;flex:1;overflow:hidden;border-radius:24px;background:#02040a;border:1px solid rgba(90,120,220,.25);box-shadow:0 20px 55px rgba(0,0,0,.32)}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.55}
+.scan{position:absolute;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent);box-shadow:0 0 14px var(--blue);animation:scan 3.1s ease-in-out infinite}
+@keyframes scan{0%,100%{top:14%;opacity:.15}50%{top:84%;opacity:.8}}
+.status{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 13px;border-radius:99px;border:1px solid var(--line);background:rgba(5,8,18,.66);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red)}.dot.ok{background:var(--green);box-shadow:0 0 10px var(--green)}
+.auto{margin-top:12px;padding:13px 15px;border-radius:18px;border:1px solid var(--line);background:rgba(14,20,39,.74)}
+.auto .label{text-align:center;font:700 10px "Space Grotesk",sans-serif;letter-spacing:2px;color:#b7c2e5;margin-bottom:9px}
+.auto .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.auto .bar div{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--violet),var(--green));transition:width .08s linear}
+.count{font:700 84px "Space Grotesk",sans-serif;text-shadow:0 0 35px rgba(66,165,255,.25)}
+.play-stage{position:relative;flex:1;overflow:hidden;border-radius:22px;background:#02040a;border:1px solid var(--line)}
+.pose-name{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:3;padding:10px 16px;border-radius:99px;background:rgba(7,10,20,.7);border:1px solid rgba(66,165,255,.3);font-weight:700;white-space:nowrap}
+.timer{position:absolute;bottom:16px;left:7%;right:7%;z-index:3}.timer .bar{height:7px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden}.timer .bar div{height:100%;width:100%;background:linear-gradient(90deg,var(--blue),var(--green))}
+.match{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);z-index:3;font-weight:700;font-size:12px}
+.hud{display:flex;justify-content:space-between;margin-bottom:10px;font:700 14px "Space Grotesk",sans-serif}
+.result{text-align:center}.score{font:700 52px "Space Grotesk",sans-serif;color:var(--green);margin:12px 0}
+.settings{display:flex;flex-direction:column;gap:12px}.row{display:flex;justify-content:space-between;align-items:center;padding:15px;border-radius:18px;border:1px solid var(--line);background:rgba(15,21,40,.72)}
+.langs{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.lang{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(16,23,44,.8);color:var(--text);font-weight:700}.lang.active{border-color:var(--green);color:var(--green)}
+.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app">
+<section class="screen active center" id="splash">
+  <div class="logo"><div class="color"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span></div><div class="pose">POSE</div></div>
+  <div class="loader"><div class="track"><div class="fill"></div></div><div class="loading">LOADING...</div></div>
+</section>
+
+<section class="screen" id="menu">
+  <div class="hero"><div class="logo"><div class="color" style="font-size:48px"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span></div><div class="pose" style="font-size:30px">POSE</div></div></div>
+  <div class="menu">
+    <button class="btn primary" id="playBtn">PLAY</button>
+    <button class="btn" id="howBtn">HOW TO PLAY</button>
+    <button class="btn" id="settingsBtn">SETTINGS</button>
+  </div>
+  <div class="bottom-grid"><div class="tile"><b>01</b>LEADERBOARD</div><div class="tile"><b>02</b>ACHIEVEMENTS</div><div class="tile"><b>03</b>SHOP</div></div>
+</section>
+
+<section class="screen" id="mode">
+  <div class="top"><button class="back" data-go="menu"></button><h2>Choose mode</h2></div>
+  <div class="mode-list">
+    <div class="mode active"><div class="mode-num">01</div><div><div class="title">1 PLAYER</div><div class="sub">Play solo</div></div></div>
+    <div class="mode"><div class="mode-num">02</div><div><div class="title">2 PLAYERS</div><div class="sub">Coming next</div></div></div>
+    <div class="mode"><div class="mode-num">04</div><div><div class="title">3–4 PLAYERS</div><div class="sub">Coming next</div></div></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn primary" id="continueBtn">CONTINUE</button>
+</section>
+
+<section class="screen" id="settings">
+  <div class="top"><button class="back" data-go="menu"></button><h2>Settings</h2></div>
+  <div class="settings">
+    <div class="row"><span>Language</span><span class="small">Default: English</span></div>
+    <div class="langs">
+      <button class="lang active" data-lang="en">English</button>
+      <button class="lang" data-lang="ru">Русский</button>
+      <button class="lang" data-lang="de">Deutsch</button>
+      <button class="lang" data-lang="uk">Українська</button>
+      <button class="lang" data-lang="fr">Français</button>
+      <button class="lang" data-lang="it">Italiano</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="how">
+  <div class="top"><button class="back" data-go="menu"></button><h2>How to play</h2></div>
+  <div class="settings">
+    <div class="row"><span>01</span><span class="small">Stand far enough so your full body is visible.</span></div>
+    <div class="row"><span>02</span><span class="small">AI detects your body automatically.</span></div>
+    <div class="row"><span>03</span><span class="small">No READY button. Stay still for about one second.</span></div>
+    <div class="row"><span>04</span><span class="small">Copy the pose before the timer ends.</span></div>
+  </div>
+</section>
+
+<section class="screen" id="camera">
+  <div class="cam-head"><h2>AI Camera</h2><p>Keep your full body inside the frame</p></div>
+  <div class="stage"><video id="video" autoplay playsinline muted></video><div class="scan"></div><div class="status"><span class="dot" id="dot"></span><span id="statusText">SEARCHING BODY</span></div></div>
+  <div class="auto"><div class="label">AI BODY LOCK · AUTO START</div><div class="bar"><div id="lockFill"></div></div></div>
+</section>
+
+<section class="screen center" id="countdown"><div class="count" id="count">3</div><div class="small">GET READY</div></section>
+
+<section class="screen" id="play">
+  <div class="hud"><span>SCORE <b id="score">0</b></span><span>LIVES <b id="lives">3</b></span></div>
+  <div class="play-stage"><video id="video2" autoplay playsinline muted></video><div class="pose-name" id="poseName">ARMS UP</div><div class="match" id="match">0%</div><div class="timer"><div class="bar"><div id="timerFill"></div></div></div></div>
+</section>
+
+<section class="screen center" id="result">
+  <div class="result"><h2>Game over</h2><div class="score" id="finalScore">0</div><button class="btn primary" id="againBtn">PLAY AGAIN</button><button class="btn" style="margin-top:10px" data-go="menu">MENU</button></div>
+</section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function show(id){$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active')}
+setTimeout(()=>show('menu'),1500);
+$$('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+$('#playBtn').onclick=()=>show('mode'); $('#howBtn').onclick=()=>show('how'); $('#settingsBtn').onclick=()=>show('settings');
+$('#continueBtn').onclick=()=>startCamera();
+$('#againBtn').onclick=()=>startCamera();
+
+let detector=null,stream=null,lockStart=0,starting=false;
+async function ensureModel(){
+  if(detector)return;
+  await tf.setBackend('webgl'); await tf.ready();
+  detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{modelType:poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING});
+}
+function key(kps,n){return kps.find(k=>k.name===n&&k.score>.35)}
+function bodyVisible(kps){return ['nose','left_shoulder','right_shoulder','left_hip','right_hip','left_ankle','right_ankle'].every(n=>key(kps,n))}
+async function startCamera(){
+  show('camera'); starting=false;lockStart=0;$('#lockFill').style.width='0%';$('#dot').classList.remove('ok');$('#statusText').textContent='LOADING AI';
+  try{await ensureModel();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});}
+  catch(e){$('#statusText').textContent='CAMERA ERROR';return}
+  const v=$('#video');v.srcObject=stream;await v.play();cameraLoop(v)
+}
+async function estimate(v){try{return await detector.estimatePoses(v,{flipHorizontal:false})}catch(e){return[]}}
+async function cameraLoop(v){
+  if(!stream||starting)return;
+  const p=await estimate(v),now=performance.now();
+  if(p[0]&&bodyVisible(p[0].keypoints)){
+    $('#dot').classList.add('ok');$('#statusText').textContent='BODY LOCKED';
+    if(!lockStart)lockStart=now;let pct=Math.min(100,(now-lockStart)/1200*100);$('#lockFill').style.width=pct+'%';
+    if(pct>=100){starting=true;stopStream();runCountdown();return}
+  }else{
+    lockStart=0;$('#lockFill').style.width='0%';$('#dot').classList.remove('ok');$('#statusText').textContent='SEARCHING BODY';
+  }
+  requestAnimationFrame(()=>cameraLoop(v))
+}
+function stopStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+function runCountdown(){show('countdown');let n=3;$('#count').textContent=n;let iv=setInterval(()=>{n--;if(n<=0){clearInterval(iv);startGame()}else $('#count').textContent=n},800)}
+
+const POSES=[
+ {name:'ARMS UP',check:(K,c)=>Math.min(1,((K.ls.y-K.lw.y)+(K.rs.y-K.rw.y))/(c*1.2))*100},
+ {name:'ARMS SIDE',check:(K,c)=>{let a=Math.abs(K.lw.y-K.ls.y),b=Math.abs(K.rw.y-K.rs.y),x=Math.abs(K.lw.x-K.ls.x)+Math.abs(K.rw.x-K.rs.x);return Math.max(0,Math.min(100,(1-(a+b)/(c*1.7))*55+Math.min(1,x/(c*1.7))*45))}},
+ {name:'WIDE STANCE',check:(K,c)=>Math.max(0,Math.min(100,(Math.abs(K.la.x-K.ra.x)/(c*1.7))*100))},
+ {name:'SQUAT',check:(K,c)=>{let hy=(K.lh.y+K.rh.y)/2,ay=(K.la.y+K.ra.y)/2;return Math.max(0,Math.min(100,(1-(ay-hy)/(c*2.6))*140))}}
+];
+let score=0,lives=3,current=null,deadline=0,duration=4,gameStream=null;
+function getK(k){let o={};['left_shoulder','right_shoulder','left_wrist','right_wrist','left_hip','right_hip','left_ankle','right_ankle'].forEach(n=>o[n.replace('left_','l').replace('right_','r').replace('shoulder','s').replace('wrist','w').replace('hip','h').replace('ankle','a')]=key(k,n));return o}
+function valid(K){return Object.values(K).every(Boolean)}
+async function startGame(){
+  show('play');score=0;lives=3;$('#score').textContent=0;$('#lives').textContent=3;
+  try{gameStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});}catch(e){return}
+  stream=gameStream;let v=$('#video2');v.srcObject=gameStream;await v.play();nextPose();gameLoop(v)
+}
+function nextPose(){current=POSES[Math.floor(Math.random()*POSES.length)];$('#poseName').textContent=current.name;deadline=performance.now()+duration*1000}
+async function gameLoop(v){
+  if(!stream)return;
+  let p=await estimate(v),pct=0;
+  if(p[0]){let K=getK(p[0].keypoints);if(valid(K)){let c=Math.abs(K.ls.x-K.rs.x)||1;pct=current.check(K,c)}}
+  $('#match').textContent=Math.round(pct)+'%';
+  if(pct>=78){score+=100;$('#score').textContent=score;nextPose()}
+  let rem=Math.max(0,deadline-performance.now());$('#timerFill').style.width=(rem/(duration*1000)*100)+'%';
+  if(rem<=0){lives--;$('#lives').textContent=lives;if(lives<=0){stopStream();$('#finalScore').textContent=score;show('result');return}else nextPose()}
+  requestAnimationFrame(()=>gameLoop(v))
+}
+$$('.lang').forEach(b=>b.onclick=()=>{$$('.lang').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+</script>
+</body></html>
