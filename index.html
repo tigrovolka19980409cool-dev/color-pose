@@ -3,215 +3,268 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#070b18">
+<meta name="theme-color" content="#07101d">
 <title>COLOR POSE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
 <style>
 :root{
-  --bg:#060914;--panel:rgba(14,20,39,.72);--panel2:rgba(22,30,56,.82);
-  --text:#f6f8ff;--muted:#94a0c3;--line:rgba(125,145,210,.18);
-  --red:#ff3b5c;--yellow:#ffcc3a;--green:#37f39a;--blue:#42a5ff;--violet:#b472ff;
+ --bg:#06101d;--bg2:#0b1425;--panel:rgba(14,22,42,.76);--line:rgba(133,151,214,.20);
+ --text:#f5f7ff;--muted:#96a4c8;--green:#37f39a;--blue:#43a8ff;--violet:#ae73ff;--red:#ff4765;--yellow:#ffd13b;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0;background:#060914;color:var(--text);font-family:Inter,sans-serif}
+html,body{height:100%;margin:0;background:#050b15;color:var(--text);font-family:Inter,sans-serif}
 body{overflow:hidden}
-body:before,body:after{content:"";position:fixed;width:58vmax;height:58vmax;border-radius:50%;filter:blur(70px);opacity:.22;pointer-events:none}
-body:before{left:-22vmax;top:-20vmax;background:radial-gradient(circle,var(--blue),transparent 66%);animation:drift1 10s ease-in-out infinite alternate}
-body:after{right:-24vmax;bottom:-22vmax;background:radial-gradient(circle,var(--green),transparent 66%);animation:drift2 13s ease-in-out infinite alternate}
-@keyframes drift1{to{transform:translate(8vmax,5vmax) scale(1.08)}}
-@keyframes drift2{to{transform:translate(-7vmax,-4vmax) scale(.95)}}
-#app{position:relative;width:100vw;height:100dvh}
+body:before,body:after{content:"";position:fixed;width:55vmax;height:55vmax;border-radius:50%;filter:blur(70px);opacity:.18;pointer-events:none}
+body:before{left:-18vmax;top:-18vmax;background:radial-gradient(circle,#2b7cff,transparent 65%)}
+body:after{right:-22vmax;bottom:-20vmax;background:radial-gradient(circle,#21d684,transparent 65%)}
+#app{height:100dvh;position:relative}
 .screen{position:absolute;inset:0;display:none;flex-direction:column;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}
 .screen.active{display:flex}
+.logo{font:700 52px/1 "Space Grotesk",sans-serif;letter-spacing:1px;text-align:center}
+.logo small{display:block;font-size:28px;letter-spacing:7px;margin-top:8px;color:white}
+.c1{color:#ff3f63}.c2{color:#ffd13b}.c3{color:#3cf2a2}.c4{color:#43a8ff}.c5{color:#b074ff}
 .center{align-items:center;justify-content:center}
-.logo{font-family:"Space Grotesk",sans-serif;font-weight:700;text-align:center;line-height:.95;letter-spacing:1px}
-.logo .color{font-size:64px;filter:drop-shadow(0 0 22px rgba(80,120,255,.25))}
-.logo .pose{font-size:38px;letter-spacing:6px;margin-top:8px}
-.c1{color:var(--red)}.c2{color:var(--yellow)}.c3{color:var(--green)}.c4{color:var(--blue)}.c5{color:var(--violet)}
-.loader{position:absolute;left:50%;bottom:max(62px,calc(env(safe-area-inset-bottom) + 48px));transform:translateX(-50%);width:220px}
-.track{height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
-.fill{height:100%;width:28%;border-radius:99px;background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue),var(--violet));animation:load 1.5s ease-in-out infinite}
-@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(430%)}}
-.loading{margin-top:12px;text-align:center;font-size:11px;letter-spacing:3px;color:var(--muted)}
-.hero{flex:1;display:flex;align-items:center;justify-content:center}
-.menu{display:flex;flex-direction:column;gap:13px}
-.btn{border:1px solid var(--line);border-radius:20px;padding:17px 18px;background:linear-gradient(180deg,rgba(25,34,62,.78),rgba(11,16,31,.82));color:var(--text);font-weight:700;font-size:16px;backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 14px 28px rgba(0,0,0,.2)}
-.btn.primary{background:linear-gradient(135deg,#23e98b,#35ffa0 45%,#3bc8ff);color:#04130b;border-color:rgba(255,255,255,.25);letter-spacing:2px}
-.btn:active{transform:scale(.98)}
-.bottom-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
-.tile{padding:14px 8px;border-radius:18px;text-align:center;border:1px solid var(--line);background:rgba(15,21,40,.68);color:#aab4d4;font-size:11px;font-weight:700}
-.tile b{display:block;width:34px;height:34px;line-height:34px;border-radius:11px;margin:0 auto 8px;background:linear-gradient(145deg,rgba(66,165,255,.22),rgba(180,114,255,.16));color:#e8edff;font-size:10px}
-.top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.back{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:rgba(16,23,44,.8);position:relative}
-.back:before{content:"";position:absolute;width:10px;height:10px;border-left:2px solid #e4eaff;border-bottom:2px solid #e4eaff;transform:rotate(45deg);left:16px;top:14px}
+.glow{filter:drop-shadow(0 0 16px rgba(67,168,255,.25))}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.back{width:42px;height:42px;border:1px solid var(--line);border-radius:14px;background:rgba(16,25,47,.85);position:relative}
+.back:before{content:"";position:absolute;width:10px;height:10px;border-left:2px solid white;border-bottom:2px solid white;transform:rotate(45deg);left:16px;top:14px}
 h2{margin:0;font:700 22px "Space Grotesk",sans-serif}
-.mode-list{display:flex;flex-direction:column;gap:14px}
-.mode{display:flex;align-items:center;gap:15px;padding:17px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(24,32,58,.8),rgba(12,17,33,.82))}
-.mode.active{border-color:var(--blue);box-shadow:0 0 28px rgba(66,165,255,.13)}
-.mode-num{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(66,165,255,.22),rgba(180,114,255,.16));font:700 13px "Space Grotesk",sans-serif}
-.mode .title{font-weight:700}.mode .sub{font-size:13px;color:var(--muted);margin-top:3px}
+.btn{width:100%;border:1px solid var(--line);border-radius:19px;padding:16px 18px;background:linear-gradient(180deg,rgba(27,38,70,.82),rgba(12,18,34,.84));color:var(--text);font-weight:700;font-size:16px}
+.btn.primary{background:linear-gradient(135deg,#25e98d,#37f39a 45%,#3bc8ff);color:#03140b;border-color:rgba(255,255,255,.24);letter-spacing:1.6px}
+.btn:active{transform:scale(.98)}
+.hero{flex:1;display:flex;align-items:center;justify-content:center}
+.menu{display:flex;flex-direction:column;gap:12px}
+.nav4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.navitem{padding:12px 5px;border:1px solid var(--line);border-radius:17px;background:rgba(13,20,39,.72);text-align:center;font-size:10px;color:#aab6d7;font-weight:700}
+.navitem b{display:block;font-size:12px;color:#eaf0ff;margin-bottom:5px}
+.card{border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(23,32,59,.8),rgba(12,18,34,.82));padding:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{padding:10px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(13,21,40,.72);font-weight:700;font-size:12px}
+.mode{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.mode .num{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(67,168,255,.22),rgba(176,116,255,.18));font:700 13px "Space Grotesk"}
+.mode .txt b{display:block}.mode .txt span{font-size:12px;color:var(--muted)}
+.profile-head{display:flex;gap:14px;align-items:center}
+.avatar{width:76px;height:76px;border-radius:22px;overflow:hidden;background:linear-gradient(145deg,#3a9dfc,#7b6cff);display:flex;align-items:center;justify-content:center;font:700 26px "Space Grotesk"}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.profile-meta h3{margin:0 0 6px;font-size:20px}.profile-meta p{margin:0;color:var(--muted);font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.stat{text-align:center;padding:12px;border-radius:16px;background:rgba(11,18,35,.72);border:1px solid var(--line)}.stat b{display:block;font-size:20px}.stat span{font-size:10px;color:var(--muted)}
+.search{display:flex;gap:8px}.search input,.field{flex:1;padding:13px 14px;border-radius:15px;border:1px solid var(--line);background:rgba(12,19,36,.82);color:white;outline:none}
+.user-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}.user-row:last-child{border-bottom:0}.mini-avatar{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#2e8ffc,#8c65ff);display:flex;align-items:center;justify-content:center;font-weight:800}
 .spacer{flex:1}
-.cam-head{text-align:center;margin-bottom:12px}.cam-head p{margin:5px 0 0;color:var(--muted);font-size:12px}
-.stage{position:relative;flex:1;overflow:hidden;border-radius:24px;background:#02040a;border:1px solid rgba(90,120,220,.25);box-shadow:0 20px 55px rgba(0,0,0,.32)}
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.55}
-.scan{position:absolute;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent);box-shadow:0 0 14px var(--blue);animation:scan 3.1s ease-in-out infinite}
-@keyframes scan{0%,100%{top:14%;opacity:.15}50%{top:84%;opacity:.8}}
-.status{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 13px;border-radius:99px;border:1px solid var(--line);background:rgba(5,8,18,.66);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--red)}.dot.ok{background:var(--green);box-shadow:0 0 10px var(--green)}
-.auto{margin-top:12px;padding:13px 15px;border-radius:18px;border:1px solid var(--line);background:rgba(14,20,39,.74)}
-.auto .label{text-align:center;font:700 10px "Space Grotesk",sans-serif;letter-spacing:2px;color:#b7c2e5;margin-bottom:9px}
-.auto .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
-.auto .bar div{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--violet),var(--green));transition:width .08s linear}
-.count{font:700 84px "Space Grotesk",sans-serif;text-shadow:0 0 35px rgba(66,165,255,.25)}
-.play-stage{position:relative;flex:1;overflow:hidden;border-radius:22px;background:#02040a;border:1px solid var(--line)}
-.pose-name{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:3;padding:10px 16px;border-radius:99px;background:rgba(7,10,20,.7);border:1px solid rgba(66,165,255,.3);font-weight:700;white-space:nowrap}
-.timer{position:absolute;bottom:16px;left:7%;right:7%;z-index:3}.timer .bar{height:7px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden}.timer .bar div{height:100%;width:100%;background:linear-gradient(90deg,var(--blue),var(--green))}
-.match{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);z-index:3;font-weight:700;font-size:12px}
-.hud{display:flex;justify-content:space-between;margin-bottom:10px;font:700 14px "Space Grotesk",sans-serif}
-.result{text-align:center}.score{font:700 52px "Space Grotesk",sans-serif;color:var(--green);margin:12px 0}
-.settings{display:flex;flex-direction:column;gap:12px}.row{display:flex;justify-content:space-between;align-items:center;padding:15px;border-radius:18px;border:1px solid var(--line);background:rgba(15,21,40,.72)}
-.langs{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.lang{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(16,23,44,.8);color:var(--text);font-weight:700}.lang.active{border-color:var(--green);color:var(--green)}
-.small{font-size:12px;color:var(--muted)}
+.stage{position:relative;flex:1;border-radius:24px;overflow:hidden;background:#02050b;border:1px solid rgba(90,120,220,.25)}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#pose3d{position:absolute;top:12px;right:12px;width:150px;height:210px;border-radius:18px;background:rgba(4,8,18,.64);border:1px solid rgba(67,168,255,.35);z-index:4}
+.pose-label{position:absolute;top:14px;left:14px;z-index:4;padding:9px 12px;border-radius:99px;background:rgba(4,8,18,.72);border:1px solid rgba(67,168,255,.35);font-weight:800;font-size:12px}
+.status{position:absolute;bottom:14px;left:14px;right:14px;z-index:4;padding:10px;border-radius:15px;background:rgba(4,8,18,.68);border:1px solid var(--line);text-align:center;font-size:11px;color:#cbd5f2}
+.bar{height:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:8px}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--violet),var(--green))}
+.hud{display:flex;justify-content:space-between;font-weight:800;margin-bottom:10px}
+.bigscore{font:700 54px "Space Grotesk";color:var(--green);text-align:center}
+.langs{display:grid;grid-template-columns:1fr 1fr;gap:9px}.lang{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,19,36,.82);color:white;font-weight:700}.lang.active{border-color:var(--green);color:var(--green)}
+.notice{font-size:12px;color:var(--muted);line-height:1.45}
+.price{font:700 34px "Space Grotesk";margin:4px 0}.price small{font-size:13px;color:var(--muted)}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;background:rgba(55,243,154,.12);border:1px solid rgba(55,243,154,.3);color:var(--green);font-size:10px;font-weight:800}
+.list{overflow:auto;min-height:0}
 </style>
 </head>
 <body>
 <div id="app">
 <section class="screen active center" id="splash">
-  <div class="logo"><div class="color"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span></div><div class="pose">POSE</div></div>
-  <div class="loader"><div class="track"><div class="fill"></div></div><div class="loading">LOADING...</div></div>
+  <div class="logo glow"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span><small>POSE</small></div>
 </section>
 
 <section class="screen" id="menu">
-  <div class="hero"><div class="logo"><div class="color" style="font-size:48px"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span></div><div class="pose" style="font-size:30px">POSE</div></div></div>
+  <div class="hero"><div class="logo glow" style="font-size:46px"><span class="c1">C</span><span class="c2">O</span><span class="c3">L</span><span class="c4">O</span><span class="c5">R</span><small style="font-size:27px">POSE</small></div></div>
   <div class="menu">
-    <button class="btn primary" id="playBtn">PLAY</button>
-    <button class="btn" id="howBtn">HOW TO PLAY</button>
-    <button class="btn" id="settingsBtn">SETTINGS</button>
+    <button class="btn primary" data-go="modes" data-i18n="play">PLAY</button>
+    <button class="btn" data-go="online" data-i18n="online">ONLINE COMPETITION</button>
+    <button class="btn" data-go="how" data-i18n="how">HOW TO PLAY</button>
   </div>
-  <div class="bottom-grid"><div class="tile"><b>01</b>LEADERBOARD</div><div class="tile"><b>02</b>ACHIEVEMENTS</div><div class="tile"><b>03</b>SHOP</div></div>
-</section>
-
-<section class="screen" id="mode">
-  <div class="top"><button class="back" data-go="menu"></button><h2>Choose mode</h2></div>
-  <div class="mode-list">
-    <div class="mode active"><div class="mode-num">01</div><div><div class="title">1 PLAYER</div><div class="sub">Play solo</div></div></div>
-    <div class="mode"><div class="mode-num">02</div><div><div class="title">2 PLAYERS</div><div class="sub">Coming next</div></div></div>
-    <div class="mode"><div class="mode-num">04</div><div><div class="title">3–4 PLAYERS</div><div class="sub">Coming next</div></div></div>
-  </div>
-  <div class="spacer"></div>
-  <button class="btn primary" id="continueBtn">CONTINUE</button>
-</section>
-
-<section class="screen" id="settings">
-  <div class="top"><button class="back" data-go="menu"></button><h2>Settings</h2></div>
-  <div class="settings">
-    <div class="row"><span>Language</span><span class="small">Default: English</span></div>
-    <div class="langs">
-      <button class="lang active" data-lang="en">English</button>
-      <button class="lang" data-lang="ru">Русский</button>
-      <button class="lang" data-lang="de">Deutsch</button>
-      <button class="lang" data-lang="uk">Українська</button>
-      <button class="lang" data-lang="fr">Français</button>
-      <button class="lang" data-lang="it">Italiano</button>
-    </div>
+  <div class="nav4">
+    <div class="navitem" data-go="search"><b>01</b><span data-i18n="search">SEARCH</span></div>
+    <div class="navitem" data-go="profile"><b>02</b><span data-i18n="profile">PROFILE</span></div>
+    <div class="navitem" data-go="subscription"><b>03</b><span data-i18n="premium">PREMIUM</span></div>
+    <div class="navitem" data-go="settings"><b>04</b><span data-i18n="settings">SETTINGS</span></div>
   </div>
 </section>
 
-<section class="screen" id="how">
-  <div class="top"><button class="back" data-go="menu"></button><h2>How to play</h2></div>
-  <div class="settings">
-    <div class="row"><span>01</span><span class="small">Stand far enough so your full body is visible.</span></div>
-    <div class="row"><span>02</span><span class="small">AI detects your body automatically.</span></div>
-    <div class="row"><span>03</span><span class="small">No READY button. Stay still for about one second.</span></div>
-    <div class="row"><span>04</span><span class="small">Copy the pose before the timer ends.</span></div>
-  </div>
+<section class="screen" id="modes">
+  <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="chooseMode">Choose mode</h2></div>
+  <div class="card mode"><div class="num">01</div><div class="txt"><b data-i18n="onePlayer">1 PLAYER</b><span data-i18n="solo">Play solo</span></div></div>
+  <div class="card mode"><div class="num">02</div><div class="txt"><b data-i18n="twoPlayers">2 PLAYERS</b><span data-i18n="localSoon">Local mode · coming next</span></div></div>
+  <div class="card mode"><div class="num">10</div><div class="txt"><b data-i18n="online10">ONLINE · UP TO 10</b><span data-i18n="worldRace">Worldwide competition</span></div></div>
+  <div class="spacer"></div><button class="btn primary" id="startSolo" data-i18n="continue">CONTINUE</button>
 </section>
 
 <section class="screen" id="camera">
-  <div class="cam-head"><h2>AI Camera</h2><p>Keep your full body inside the frame</p></div>
-  <div class="stage"><video id="video" autoplay playsinline muted></video><div class="scan"></div><div class="status"><span class="dot" id="dot"></span><span id="statusText">SEARCHING BODY</span></div></div>
-  <div class="auto"><div class="label">AI BODY LOCK · AUTO START</div><div class="bar"><div id="lockFill"></div></div></div>
+  <div class="top"><button class="back" data-go="modes"></button><h2 data-i18n="camera">AI Camera</h2></div>
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="pose3d"></canvas>
+    <div class="pose-label" id="poseText">ARMS UP</div>
+    <div class="status"><span id="cameraStatus">SEARCHING FULL BODY</span><div class="bar"><div id="lockFill"></div></div></div>
+  </div>
 </section>
 
-<section class="screen center" id="countdown"><div class="count" id="count">3</div><div class="small">GET READY</div></section>
-
-<section class="screen" id="play">
-  <div class="hud"><span>SCORE <b id="score">0</b></span><span>LIVES <b id="lives">3</b></span></div>
-  <div class="play-stage"><video id="video2" autoplay playsinline muted></video><div class="pose-name" id="poseName">ARMS UP</div><div class="match" id="match">0%</div><div class="timer"><div class="bar"><div id="timerFill"></div></div></div></div>
+<section class="screen" id="game">
+  <div class="hud"><span><span data-i18n="score">SCORE</span> <b id="score">0</b></span><span><span data-i18n="lives">LIVES</span> <b id="lives">3</b></span></div>
+  <div class="stage">
+    <video id="video2" autoplay playsinline muted></video>
+    <canvas id="pose3dGame"></canvas>
+    <div class="pose-label" id="poseTextGame">ARMS UP</div>
+    <div class="status"><span id="matchText">0%</span><div class="bar"><div id="timerFill" style="width:100%"></div></div></div>
+  </div>
 </section>
 
 <section class="screen center" id="result">
-  <div class="result"><h2>Game over</h2><div class="score" id="finalScore">0</div><button class="btn primary" id="againBtn">PLAY AGAIN</button><button class="btn" style="margin-top:10px" data-go="menu">MENU</button></div>
+  <h2 data-i18n="roundDone">Round finished</h2>
+  <div class="bigscore" id="finalScore">0</div>
+  <div class="card" style="width:100%;margin:12px 0 14px;text-align:center">
+    <div class="notice" data-i18n="resultHint">Fast time + accurate pose = more points.</div>
+  </div>
+  <button class="btn primary" id="again" data-i18n="playAgain">PLAY AGAIN</button>
+  <button class="btn" style="margin-top:10px" data-go="menu" data-i18n="exit">EXIT</button>
+</section>
+
+<section class="screen" id="online">
+  <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="online">Online competition</h2></div>
+  <div class="card">
+    <span class="badge">1–10 PLAYERS</span>
+    <h3 data-i18n="worldRace">Worldwide competition</h3>
+    <p class="notice" data-i18n="onlineDesc">Each player receives a camera pose challenge. The ranking uses accuracy, reaction time and completion time.</p>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="grid2">
+      <div class="stat"><b>92%</b><span>ACCURACY</span></div>
+      <div class="stat"><b>1.8s</b><span>REACTION</span></div>
+    </div>
+    <div class="stats"><div class="stat"><b>1</b><span>PLACE</span></div><div class="stat"><b>8</b><span>PLAYERS</span></div><div class="stat"><b>1260</b><span>POINTS</span></div></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn primary" data-go="subscription" data-i18n="unlockOnline">UNLOCK ONLINE</button>
+</section>
+
+<section class="screen" id="subscription">
+ <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="premium">Premium</h2></div>
+ <div class="card">
+   <span class="badge">MONTHLY</span><div class="price">€9 <small>/ month</small></div>
+   <p class="notice" data-i18n="monthlyDesc">Online competitions, public profile, global ranking and friends.</p>
+ </div>
+ <div class="card" style="margin-top:12px;border-color:rgba(55,243,154,.35)">
+   <span class="badge">YEARLY OFFER</span><div class="price">€84 <small>/ year · €7/month</small></div>
+   <p class="notice" data-i18n="yearlyDesc">Best value. Save €24 per year.</p>
+ </div>
+ <div class="spacer"></div><button class="btn primary" id="subscribeBtn" data-i18n="subscribe">SUBSCRIBE</button>
+</section>
+
+<section class="screen" id="profile">
+ <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="profile">Profile</h2></div>
+ <div class="card">
+  <div class="profile-head"><div class="avatar" id="avatarBox">CP</div><div class="profile-meta"><h3 id="profileName">Player</h3><p>@colorpose</p></div></div>
+  <div class="stats"><div class="stat"><b id="bestStat">0</b><span>BEST</span></div><div class="stat"><b>0</b><span>FOLLOWING</span></div><div class="stat"><b>0</b><span>FOLLOWERS</span></div></div>
+ </div>
+ <div class="card" style="margin-top:12px">
+  <input class="field" id="nameInput" placeholder="Your name">
+  <button class="btn" style="margin-top:10px" id="saveName" data-i18n="saveName">SAVE NAME</button>
+  <button class="btn primary" style="margin-top:10px" id="selfieBtn" data-i18n="createAvatar">CREATE AVATAR FROM SELFIE</button>
+  <input type="file" accept="image/*" capture="user" id="selfieInput" hidden>
+  <p class="notice" data-i18n="avatarNote">Prototype: your selfie becomes the profile image. AI 3D face/clothes generation needs a separate avatar service.</p>
+ </div>
+</section>
+
+<section class="screen" id="search">
+ <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="search">Search</h2></div>
+ <div class="search"><input id="searchInput" placeholder="Search name or @username"><button class="btn" style="width:auto" id="searchBtn">GO</button></div>
+ <div class="card list" style="margin-top:12px" id="peopleList"></div>
+</section>
+
+<section class="screen" id="settings">
+ <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="settings">Settings</h2></div>
+ <div class="card"><h3 data-i18n="language">Language</h3><div class="langs">
+   <button class="lang active" data-lang="en">English</button><button class="lang" data-lang="ru">Русский</button>
+   <button class="lang" data-lang="de">Deutsch</button><button class="lang" data-lang="uk">Українська</button>
+   <button class="lang" data-lang="fr">Français</button><button class="lang" data-lang="it">Italiano</button>
+ </div></div>
+</section>
+
+<section class="screen" id="how">
+ <div class="top"><button class="back" data-go="menu"></button><h2 data-i18n="how">How to play</h2></div>
+ <div class="card"><p class="notice" data-i18n="howDesc">Look at the 3D pose model, not only the words. Copy the body pose. The AI compares your body with the target and scores speed + accuracy.</p></div>
 </section>
 </div>
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function show(id){$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active')}
-setTimeout(()=>show('menu'),1500);
-$$('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
-$('#playBtn').onclick=()=>show('mode'); $('#howBtn').onclick=()=>show('how'); $('#settingsBtn').onclick=()=>show('settings');
-$('#continueBtn').onclick=()=>startCamera();
-$('#againBtn').onclick=()=>startCamera();
+const TR={
+ en:{play:'PLAY',online:'ONLINE COMPETITION',how:'HOW TO PLAY',search:'SEARCH',profile:'PROFILE',premium:'PREMIUM',settings:'SETTINGS',chooseMode:'Choose mode',onePlayer:'1 PLAYER',solo:'Play solo',twoPlayers:'2 PLAYERS',localSoon:'Local mode · coming next',online10:'ONLINE · UP TO 10',worldRace:'Worldwide competition',continue:'CONTINUE',camera:'AI Camera',score:'SCORE',lives:'LIVES',roundDone:'Round finished',resultHint:'Fast time + accurate pose = more points.',playAgain:'PLAY AGAIN',exit:'EXIT',onlineDesc:'Each player receives a camera pose challenge. The ranking uses accuracy, reaction time and completion time.',unlockOnline:'UNLOCK ONLINE',monthlyDesc:'Online competitions, public profile, global ranking and friends.',yearlyDesc:'Best value. Save €24 per year.',subscribe:'SUBSCRIBE',saveName:'SAVE NAME',createAvatar:'CREATE AVATAR FROM SELFIE',avatarNote:'Prototype: your selfie becomes the profile image. AI 3D face/clothes generation needs a separate avatar service.',language:'Language',howDesc:'Look at the 3D pose model, not only the words. Copy the body pose. The AI compares your body with the target and scores speed + accuracy.'},
+ ru:{play:'ИГРАТЬ',online:'ОНЛАЙН-СОРЕВНОВАНИЕ',how:'КАК ИГРАТЬ',search:'ПОИСК',profile:'ПРОФИЛЬ',premium:'ПРЕМИУМ',settings:'НАСТРОЙКИ',chooseMode:'Выбор режима',onePlayer:'1 ИГРОК',solo:'Играть одному',twoPlayers:'2 ИГРОКА',localSoon:'Локальный режим · позже',online10:'ОНЛАЙН · ДО 10',worldRace:'Соревнование по всему миру',continue:'ПРОДОЛЖИТЬ',camera:'AI-камера',score:'СЧЁТ',lives:'ЖИЗНИ',roundDone:'Раунд завершён',resultHint:'Быстрое время + точная поза = больше очков.',playAgain:'ИГРАТЬ ЕЩЁ',exit:'ВЫЙТИ',onlineDesc:'Каждый игрок получает задание с позой через камеру. Рейтинг считается по точности, реакции и времени выполнения.',unlockOnline:'ОТКРЫТЬ ОНЛАЙН',monthlyDesc:'Онлайн-соревнования, публичный профиль, мировой рейтинг и друзья.',yearlyDesc:'Выгоднее: экономия €24 в год.',subscribe:'ПОДПИСАТЬСЯ',saveName:'СОХРАНИТЬ ИМЯ',createAvatar:'СОЗДАТЬ АВАТАР ИЗ СЕЛФИ',avatarNote:'Прототип: селфи становится фото профиля. Для настоящего AI 3D лица и одежды нужен отдельный сервис аватаров.',language:'Язык',howDesc:'Смотри на 3D-модель позы, а не только на слова. Повтори положение тела. AI сравнивает тело и считает скорость + точность.'},
+ de:{play:'SPIELEN',online:'ONLINE-WETTBEWERB',how:'SPIELANLEITUNG',search:'SUCHE',profile:'PROFIL',premium:'PREMIUM',settings:'EINSTELLUNGEN',chooseMode:'Modus wählen',onePlayer:'1 SPIELER',solo:'Alleine spielen',twoPlayers:'2 SPIELER',localSoon:'Lokaler Modus · später',online10:'ONLINE · BIS 10',worldRace:'Weltweiter Wettbewerb',continue:'WEITER',camera:'KI-Kamera',score:'PUNKTE',lives:'LEBEN',roundDone:'Runde beendet',resultHint:'Schnelle Zeit + genaue Pose = mehr Punkte.',playAgain:'NOCHMAL',exit:'BEENDEN',onlineDesc:'Jeder Spieler bekommt eine Pose-Aufgabe per Kamera. Das Ranking nutzt Genauigkeit, Reaktionszeit und Abschlusszeit.',unlockOnline:'ONLINE FREISCHALTEN',monthlyDesc:'Online-Wettbewerbe, öffentliches Profil, Weltrangliste und Freunde.',yearlyDesc:'Bestes Angebot. €24 pro Jahr sparen.',subscribe:'ABONNIEREN',saveName:'NAME SPEICHERN',createAvatar:'AVATAR AUS SELFIE',avatarNote:'Prototyp: Das Selfie wird zum Profilbild. Für echtes KI-3D-Gesicht/Kleidung ist ein externer Avatar-Dienst nötig.',language:'Sprache',howDesc:'Schau auf die 3D-Pose, nicht nur auf den Text. Kopiere die Körperhaltung. Die KI bewertet Geschwindigkeit + Genauigkeit.'},
+ uk:{play:'ГРАТИ',online:'ОНЛАЙН-ЗМАГАННЯ',how:'ЯК ГРАТИ',search:'ПОШУК',profile:'ПРОФІЛЬ',premium:'ПРЕМІУМ',settings:'НАЛАШТУВАННЯ',chooseMode:'Вибір режиму',onePlayer:'1 ГРАВЕЦЬ',solo:'Грати одному',twoPlayers:'2 ГРАВЦІ',localSoon:'Локальний режим · пізніше',online10:'ОНЛАЙН · ДО 10',worldRace:'Змагання по всьому світу',continue:'ПРОДОВЖИТИ',camera:'AI-камера',score:'РАХУНОК',lives:'ЖИТТЯ',roundDone:'Раунд завершено',resultHint:'Швидкість + точність = більше очок.',playAgain:'ГРАТИ ЩЕ',exit:'ВИЙТИ',onlineDesc:'Кожен гравець отримує завдання з позою через камеру. Рейтинг за точністю, реакцією та часом.',unlockOnline:'ВІДКРИТИ ОНЛАЙН',monthlyDesc:'Онлайн-змагання, публічний профіль, світовий рейтинг і друзі.',yearlyDesc:'Вигідніше: економія €24 на рік.',subscribe:'ПІДПИСАТИСЯ',saveName:'ЗБЕРЕГТИ ІМ’Я',createAvatar:'АВАТАР ІЗ СЕЛФІ',avatarNote:'Прототип: селфі стає фото профілю. Для справжнього AI 3D обличчя/одягу потрібен окремий сервіс.',language:'Мова',howDesc:'Дивись на 3D-модель пози, а не тільки на слова. Повтори положення тіла. AI оцінює швидкість + точність.'}
+};
+['fr','it'].forEach(l=>TR[l]=TR.en);
+let lang=localStorage.getItem('cp-lang')||'en';
+function applyLang(){document.documentElement.lang=lang;$$('[data-i18n]').forEach(el=>{let k=el.dataset.i18n;if(TR[lang]&&TR[lang][k])el.textContent=TR[lang][k]});$$('.lang').forEach(b=>b.classList.toggle('active',b.dataset.lang===lang))}
+function show(id){$$('.screen').forEach(s=>s.classList.remove('active'));$('#'+id).classList.add('active')}
+setTimeout(()=>show('menu'),1200);
+$$('[data-go]').forEach(el=>el.onclick=()=>show(el.dataset.go));
+$$('.lang').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;localStorage.setItem('cp-lang',lang);applyLang()});
+applyLang();
 
-let detector=null,stream=null,lockStart=0,starting=false;
-async function ensureModel(){
-  if(detector)return;
-  await tf.setBackend('webgl'); await tf.ready();
-  detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{modelType:poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING});
-}
-function key(kps,n){return kps.find(k=>k.name===n&&k.score>.35)}
-function bodyVisible(kps){return ['nose','left_shoulder','right_shoulder','left_hip','right_hip','left_ankle','right_ankle'].every(n=>key(kps,n))}
-async function startCamera(){
-  show('camera'); starting=false;lockStart=0;$('#lockFill').style.width='0%';$('#dot').classList.remove('ok');$('#statusText').textContent='LOADING AI';
-  try{await ensureModel();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});}
-  catch(e){$('#statusText').textContent='CAMERA ERROR';return}
-  const v=$('#video');v.srcObject=stream;await v.play();cameraLoop(v)
-}
-async function estimate(v){try{return await detector.estimatePoses(v,{flipHorizontal:false})}catch(e){return[]}}
-async function cameraLoop(v){
-  if(!stream||starting)return;
-  const p=await estimate(v),now=performance.now();
-  if(p[0]&&bodyVisible(p[0].keypoints)){
-    $('#dot').classList.add('ok');$('#statusText').textContent='BODY LOCKED';
-    if(!lockStart)lockStart=now;let pct=Math.min(100,(now-lockStart)/1200*100);$('#lockFill').style.width=pct+'%';
-    if(pct>=100){starting=true;stopStream();runCountdown();return}
-  }else{
-    lockStart=0;$('#lockFill').style.width='0%';$('#dot').classList.remove('ok');$('#statusText').textContent='SEARCHING BODY';
-  }
-  requestAnimationFrame(()=>cameraLoop(v))
-}
-function stopStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
-function runCountdown(){show('countdown');let n=3;$('#count').textContent=n;let iv=setInterval(()=>{n--;if(n<=0){clearInterval(iv);startGame()}else $('#count').textContent=n},800)}
+const people=[['Mila','@mila_move'],['Nico','@nico_pose'],['Samira','@samira_fit'],['Alex','@alexmotion'],['Livia','@livia_play']];
+function renderPeople(q=''){let data=people.filter(x=>(x[0]+' '+x[1]).toLowerCase().includes(q.toLowerCase()));$('#peopleList').innerHTML=data.map((p,i)=>`<div class="user-row"><div class="mini-avatar">${p[0][0]}</div><div style="flex:1"><b>${p[0]}</b><div class="notice">${p[1]}</div></div><span>›</span></div>`).join('')||'<div class="notice">No users found</div>'}
+renderPeople();$('#searchBtn').onclick=()=>renderPeople($('#searchInput').value);
 
-const POSES=[
- {name:'ARMS UP',check:(K,c)=>Math.min(1,((K.ls.y-K.lw.y)+(K.rs.y-K.rw.y))/(c*1.2))*100},
- {name:'ARMS SIDE',check:(K,c)=>{let a=Math.abs(K.lw.y-K.ls.y),b=Math.abs(K.rw.y-K.rs.y),x=Math.abs(K.lw.x-K.ls.x)+Math.abs(K.rw.x-K.rs.x);return Math.max(0,Math.min(100,(1-(a+b)/(c*1.7))*55+Math.min(1,x/(c*1.7))*45))}},
- {name:'WIDE STANCE',check:(K,c)=>Math.max(0,Math.min(100,(Math.abs(K.la.x-K.ra.x)/(c*1.7))*100))},
- {name:'SQUAT',check:(K,c)=>{let hy=(K.lh.y+K.rh.y)/2,ay=(K.la.y+K.ra.y)/2;return Math.max(0,Math.min(100,(1-(ay-hy)/(c*2.6))*140))}}
+$('#saveName').onclick=()=>{let n=$('#nameInput').value.trim();if(n){localStorage.setItem('cp-name',n);$('#profileName').textContent=n}}
+let savedName=localStorage.getItem('cp-name');if(savedName)$('#profileName').textContent=savedName;
+$('#selfieBtn').onclick=()=>$('#selfieInput').click();
+$('#selfieInput').onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{$('#avatarBox').innerHTML=`<img src="${r.result}">`;localStorage.setItem('cp-selfie',r.result)};r.readAsDataURL(f)};
+let sf=localStorage.getItem('cp-selfie');if(sf)$('#avatarBox').innerHTML=`<img src="${sf}">`;
+$('#subscribeBtn').onclick=()=>alert('Payment is not connected yet. Stripe/App Store billing must be added with a backend.');
+
+let detector=null,stream=null,lockStart=0,calib=null,score=0,lives=3,currentPose=null,deadline=0,gameLoopId=null;
+const poseDefs=[
+ {name:'ARMS UP',j:{ls:[-.45,.25],rs:[.45,.25],le:[-.65,.65],re:[.65,.65],lw:[-.72,1.15],rw:[.72,1.15],lh:[-.28,-.45],rh:[.28,-.45],lk:[-.28,-1.15],rk:[.28,-1.15],la:[-.28,-1.8],ra:[.28,-1.8]}},
+ {name:'WIDE STANCE',j:{ls:[-.45,.3],rs:[.45,.3],le:[-.72,.05],re:[.72,.05],lw:[-.95,-.2],rw:[.95,-.2],lh:[-.3,-.45],rh:[.3,-.45],lk:[-.65,-1.12],rk:[.65,-1.12],la:[-.9,-1.78],ra:[.9,-1.78]}},
+ {name:'T POSE',j:{ls:[-.45,.3],rs:[.45,.3],le:[-.95,.3],re:[.95,.3],lw:[-1.4,.3],rw:[1.4,.3],lh:[-.28,-.45],rh:[.28,-.45],lk:[-.28,-1.12],rk:[.28,-1.12],la:[-.28,-1.78],ra:[.28,-1.78]}},
+ {name:'SQUAT',j:{ls:[-.45,.25],rs:[.45,.25],le:[-.65,0],re:[.65,0],lw:[-.75,-.25],rw:[.75,-.25],lh:[-.35,-.45],rh:[.35,-.45],lk:[-.7,-.9],rk:[.7,-.9],la:[-.85,-1.3],ra:[.85,-1.3]}}
 ];
-let score=0,lives=3,current=null,deadline=0,duration=4,gameStream=null;
-function getK(k){let o={};['left_shoulder','right_shoulder','left_wrist','right_wrist','left_hip','right_hip','left_ankle','right_ankle'].forEach(n=>o[n.replace('left_','l').replace('right_','r').replace('shoulder','s').replace('wrist','w').replace('hip','h').replace('ankle','a')]=key(k,n));return o}
-function valid(K){return Object.values(K).every(Boolean)}
-async function startGame(){
-  show('play');score=0;lives=3;$('#score').textContent=0;$('#lives').textContent=3;
-  try{gameStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});}catch(e){return}
-  stream=gameStream;let v=$('#video2');v.srcObject=gameStream;await v.play();nextPose();gameLoop(v)
+
+function draw3D(canvas,pose){
+  let w=canvas.clientWidth||150,h=canvas.clientHeight||210;
+  canvas.width=w*devicePixelRatio;canvas.height=h*devicePixelRatio;
+  let r=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});r.setPixelRatio(devicePixelRatio);r.setSize(w,h,false);
+  let s=new THREE.Scene(),c=new THREE.PerspectiveCamera(40,w/h,.1,100);c.position.set(0,0,6);
+  s.add(new THREE.AmbientLight(0xffffff,1.5));
+  let mat=new THREE.MeshStandardMaterial({color:0x4bb3ff,emissive:0x123355,metalness:.25,roughness:.35});
+  let jointGeo=new THREE.SphereGeometry(.12,14,14),joints={};
+  Object.entries(pose.j).forEach(([k,p])=>{let m=new THREE.Mesh(jointGeo,mat);m.position.set(p[0],p[1],0);s.add(m);joints[k]=m});
+  let head=new THREE.Mesh(new THREE.SphereGeometry(.27,18,18),new THREE.MeshStandardMaterial({color:0xe8f1ff,emissive:0x112233}));head.position.set(0,.95,0);s.add(head);
+  function bone(a,b){let pa=joints[a].position,pb=joints[b].position,mid=new THREE.Vector3().addVectors(pa,pb).multiplyScalar(.5),len=pa.distanceTo(pb);let g=new THREE.CylinderGeometry(.07,.07,len,10),m=new THREE.Mesh(g,mat);m.position.copy(mid);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3().subVectors(pb,pa).normalize());s.add(m)}
+  [['ls','rs'],['ls','le'],['le','lw'],['rs','re'],['re','rw'],['ls','lh'],['rs','rh'],['lh','rh'],['lh','lk'],['lk','la'],['rh','rk'],['rk','ra']].forEach(x=>bone(...x));
+  r.render(s,c);
 }
-function nextPose(){current=POSES[Math.floor(Math.random()*POSES.length)];$('#poseName').textContent=current.name;deadline=performance.now()+duration*1000}
-async function gameLoop(v){
-  if(!stream)return;
-  let p=await estimate(v),pct=0;
-  if(p[0]){let K=getK(p[0].keypoints);if(valid(K)){let c=Math.abs(K.ls.x-K.rs.x)||1;pct=current.check(K,c)}}
-  $('#match').textContent=Math.round(pct)+'%';
-  if(pct>=78){score+=100;$('#score').textContent=score;nextPose()}
-  let rem=Math.max(0,deadline-performance.now());$('#timerFill').style.width=(rem/(duration*1000)*100)+'%';
-  if(rem<=0){lives--;$('#lives').textContent=lives;if(lives<=0){stopStream();$('#finalScore').textContent=score;show('result');return}else nextPose()}
-  requestAnimationFrame(()=>gameLoop(v))
+function setPose(p){currentPose=p;$('#poseText').textContent=p.name;$('#poseTextGame').textContent=p.name;draw3D($('#pose3d'),p);draw3D($('#pose3dGame'),p)}
+
+async function ensureModel(){if(detector)return;await tf.setBackend('webgl');await tf.ready();detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{modelType:poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING})}
+function kp(k,n){let p=k.find(x=>x.name===n);return p&&p.score>.35?p:null}
+function fullBody(k){return ['nose','left_shoulder','right_shoulder','left_hip','right_hip','left_ankle','right_ankle'].every(n=>kp(k,n))}
+async function est(v){try{return await detector.estimatePoses(v,{flipHorizontal:false})}catch(e){return[]}}
+function stopStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+
+$('#startSolo').onclick=async()=>{show('camera');setPose(poseDefs[0]);$('#cameraStatus').textContent='LOADING AI';$('#lockFill').style.width='0%';lockStart=0;await ensureModel();try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});let v=$('#video');v.srcObject=stream;await v.play();cameraLoop(v)}catch(e){$('#cameraStatus').textContent='CAMERA ERROR'}};
+async function cameraLoop(v){if(!stream)return;let p=await est(v),now=performance.now();if(p[0]&&fullBody(p[0].keypoints)){if(!lockStart)lockStart=now;let pct=Math.min(100,(now-lockStart)/1200*100);$('#cameraStatus').textContent='BODY LOCKED';$('#lockFill').style.width=pct+'%';if(pct>=100){stopStream();startGame();return}}else{lockStart=0;$('#lockFill').style.width='0%';$('#cameraStatus').textContent='MOVE BACK · SHOW FULL BODY'}requestAnimationFrame(()=>cameraLoop(v))}
+async function startGame(){show('game');score=0;lives=3;$('#score').textContent=0;$('#lives').textContent=3;setPose(poseDefs[Math.floor(Math.random()*poseDefs.length)]);deadline=performance.now()+4000;try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});let v=$('#video2');v.srcObject=stream;await v.play();gameLoop(v)}catch(e){}}
+function targetScore(k,p){
+  let names={ls:'left_shoulder',rs:'right_shoulder',le:'left_elbow',re:'right_elbow',lw:'left_wrist',rw:'right_wrist',lh:'left_hip',rh:'right_hip',lk:'left_knee',rk:'right_knee',la:'left_ankle',ra:'right_ankle'};
+  let ls=kp(k,'left_shoulder'),rs=kp(k,'right_shoulder');if(!ls||!rs)return 0;let sw=Math.hypot(ls.x-rs.x,ls.y-rs.y)||1,centerX=(ls.x+rs.x)/2,centerY=(ls.y+rs.y)/2,total=0,n=0;
+  for(let [id,name] of Object.entries(names)){let a=kp(k,name),b=p.j[id];if(!a||!b)continue;let nx=(a.x-centerX)/sw,ny=(centerY-a.y)/sw;let d=Math.hypot(nx-b[0],ny-b[1]);total+=Math.max(0,1-d/1.2);n++}
+  return n?total/n*100:0
 }
-$$('.lang').forEach(b=>b.onclick=()=>{$$('.lang').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+async function gameLoop(v){if(!stream)return;let p=await est(v),pct=0;if(p[0])pct=targetScore(p[0].keypoints,currentPose);$('#matchText').textContent=Math.round(pct)+'%';if(pct>=78){score+=Math.round(80+pct);$('#score').textContent=score;setPose(poseDefs[Math.floor(Math.random()*poseDefs.length)]);deadline=performance.now()+4000}let rem=Math.max(0,deadline-performance.now());$('#timerFill').style.width=(rem/4000*100)+'%';if(rem<=0){lives--;$('#lives').textContent=lives;if(lives<=0){stopStream();finish();return}else{setPose(poseDefs[Math.floor(Math.random()*poseDefs.length)]);deadline=performance.now()+4000}}requestAnimationFrame(()=>gameLoop(v))}
+function finish(){show('result');$('#finalScore').textContent=score;let best=+localStorage.getItem('cp-best')||0;if(score>best){best=score;localStorage.setItem('cp-best',best)}$('#bestStat').textContent=best}
+$('#again').onclick=()=>$('#startSolo').click();$('#bestStat').textContent=localStorage.getItem('cp-best')||0;
 </script>
 </body></html>
